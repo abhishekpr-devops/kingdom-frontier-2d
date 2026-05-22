@@ -11,6 +11,20 @@ export default class WorldScene extends Phaser.Scene {
     this.worldW = 1800;
     this.worldH = 1100;
 
+    this.enemyLanes = [
+      { name: "north road", x: 1180, y: 235 },
+      { name: "main road", x: 1040, y: 535 },
+      { name: "south road", x: 980, y: 790 },
+      { name: "forest path", x: 1340, y: 420 },
+    ];
+
+    this.castleAttackPoints = [
+      { x: 235, y: 455 },
+      { x: 235, y: 515 },
+      { x: 235, y: 575 },
+      { x: 205, y: 520 },
+    ];
+
     this.wave = 1;
     this.waveCooldown = false;
     this.castleHealth = 500;
@@ -102,6 +116,7 @@ export default class WorldScene extends Phaser.Scene {
 
     this.createWorld();
     this.createBattlefieldPolish();
+    this.drawEnemyLaneMarkers();
     this.createCastle();
     this.createCastleDamageVisuals();
     this.createPlayer();
@@ -228,6 +243,24 @@ export default class WorldScene extends Phaser.Scene {
     this.add.rectangle(x + 10, y + 8, 26, 7, 0x78350f).setRotation(-0.4);
     this.add.circle(x, y, 16, 0xf97316, 0.85);
     this.add.circle(x, y - 7, 10, 0xfacc15, 0.9);
+  }
+
+  drawEnemyLaneMarkers() {
+    if (!this.enemyLanes) return;
+
+    this.enemyLanes.forEach((lane) => {
+      const marker = this.add.graphics();
+      marker.lineStyle(3, 0xfacc15, 0.18);
+      marker.strokeCircle(lane.x, lane.y, 28);
+
+      this.add.text(lane.x - 34, lane.y - 46, lane.name, {
+        fontSize: "10px",
+        color: "#facc15",
+        fontFamily: "monospace",
+        stroke: "#000000",
+        strokeThickness: 2,
+      }).setAlpha(0.5);
+    });
   }
 
   drawTree(x, y) {
@@ -870,13 +903,13 @@ export default class WorldScene extends Phaser.Scene {
     const count = isBossWave ? 8 + this.wave : 5 + this.wave * 2;
 
     for (let i = 0; i < count; i++) {
-      const { x, y } = this.getSpawnPoint();
-      this.spawnEnemy(x, y, false);
+      const { x, y, lane } = this.getSpawnPoint();
+      this.spawnEnemy(x, y, false, lane);
     }
 
     if (isBossWave) {
       const bossSpawn = this.getSpawnPoint();
-      this.spawnEnemy(bossSpawn.x, bossSpawn.y, true);
+      this.spawnEnemy(bossSpawn.x, bossSpawn.y, true, bossSpawn.lane);
       this.showMessage(`Boss wave ${this.wave}. Boss Orc has appeared.`);
       this.playSound("boss");
     } else {
@@ -888,29 +921,41 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   getSpawnPoint() {
-    const spawnSide = Phaser.Math.RND.pick(["right", "bottom", "top"]);
+    const lane = Phaser.Math.RND.pick(this.enemyLanes);
 
-    if (spawnSide === "right") {
+    if (lane.name === "north road") {
       return {
-        x: Phaser.Math.Between(1450, 1740),
-        y: Phaser.Math.Between(230, 950),
+        x: Phaser.Math.Between(1320, 1740),
+        y: Phaser.Math.Between(120, 220),
+        lane,
       };
     }
 
-    if (spawnSide === "bottom") {
+    if (lane.name === "main road") {
       return {
-        x: Phaser.Math.Between(700, 1600),
-        y: Phaser.Math.Between(930, 1040),
+        x: Phaser.Math.Between(1420, 1760),
+        y: Phaser.Math.Between(480, 580),
+        lane,
+      };
+    }
+
+    if (lane.name === "south road") {
+      return {
+        x: Phaser.Math.Between(1250, 1680),
+        y: Phaser.Math.Between(760, 980),
+        lane,
       };
     }
 
     return {
-      x: Phaser.Math.Between(900, 1650),
-      y: Phaser.Math.Between(100, 200),
+      x: Phaser.Math.Between(1450, 1760),
+      y: Phaser.Math.Between(330, 500),
+      lane,
     };
   }
 
-  spawnEnemy(x, y, isBoss = false) {
+
+  spawnEnemy(x, y, isBoss = false, lane = null) {
     const availableTypes = this.wave >= 4
       ? ["Goblin", "Orc Warrior", "Orc Archer", "Armored Orc"]
       : ["Goblin", "Orc Warrior", "Orc Archer"];
@@ -1078,6 +1123,9 @@ export default class WorldScene extends Phaser.Scene {
     enemy.nextWander = 0;
     enemy.wanderX = 0;
     enemy.wanderY = 0;
+    enemy.lane = lane ?? Phaser.Math.RND.pick(this.enemyLanes);
+    enemy.laneReached = false;
+    enemy.castleAttackPoint = Phaser.Math.RND.pick(this.castleAttackPoints);
 
     enemy.nameLabel = this.add.text(enemy.x - 45, enemy.y - 72, enemyType, {
       fontSize: enemy.isBoss ? "13px" : "10px",
@@ -1388,17 +1436,36 @@ export default class WorldScene extends Phaser.Scene {
       };
     }
 
+    // Castle attackers first move to their assigned lane waypoint.
+    // After reaching it, they move to a specific castle gate attack point.
+    if (!enemy.laneReached && enemy.lane) {
+      const laneDistance = Phaser.Math.Distance.Between(enemy.x, enemy.y, enemy.lane.x, enemy.lane.y);
+
+      if (laneDistance > 55) {
+        return {
+          kind: "lane",
+          x: enemy.lane.x,
+          y: enemy.lane.y,
+        };
+      }
+
+      enemy.laneReached = true;
+    }
+
+    const attackPoint = enemy.castleAttackPoint ?? this.castleGatePoint;
+
     return {
       kind: "castle",
-      x: this.castleGatePoint.x,
-      y: this.castleGatePoint.y,
+      x: attackPoint.x,
+      y: attackPoint.y,
     };
   }
+
 
   updateMeleeEnemy(enemy, targetX, targetY, time, targetKind = "castle", distance = null) {
     const dist = distance ?? Phaser.Math.Distance.Between(enemy.x, enemy.y, targetX, targetY);
 
-    const attackDistance = targetKind === "castle" ? 96 : 58;
+    const attackDistance = targetKind === "castle" ? 96 : targetKind === "lane" ? 28 : 58;
 
     if (enemy.isBoss) {
       this.updateBossSpecials(enemy, time);
@@ -1407,6 +1474,11 @@ export default class WorldScene extends Phaser.Scene {
     // Enemy locks in when close enough. No more walking away while attacking.
     if (dist <= attackDistance) {
       enemy.body.setVelocity(0);
+
+      if (targetKind === "lane") {
+        enemy.laneReached = true;
+        return;
+      }
 
       if (targetKind === "castle" && time - enemy.lastAttack > 650) {
         enemy.lastAttack = time;
