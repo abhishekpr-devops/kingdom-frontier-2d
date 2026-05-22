@@ -278,33 +278,60 @@ export default class WorldScene extends Phaser.Scene {
   createPlayer() {
     this.player = this.add.container(520, 545);
 
-    this.player.shadow = this.add.ellipse(0, 24, 38, 13, 0x000000, 0.28);
-    this.player.outline = this.add.rectangle(0, 0, 34, 44, 0x0f172a);
-    this.player.bodyShape = this.add.rectangle(0, 0, 28, 38, 0x38bdf8);
-    this.player.headOutline = this.add.circle(0, -24, 17, 0x0f172a);
-    this.player.head = this.add.circle(0, -24, 14, 0xfacc15);
-    this.player.sword = this.add.rectangle(22, 0, 7, 32, 0xe5e7eb);
+    // Player Knight: silver armor + blue cloth + shield + sword + cape.
+    this.player.shadow = this.add.ellipse(0, 27, 44, 14, 0x000000, 0.32);
+
+    this.player.cape = this.add.rectangle(-12, 4, 18, 42, 0x1d4ed8);
+    this.player.cape.setAlpha(0.9);
+
+    this.player.outline = this.add.rectangle(0, 0, 38, 46, 0x0f172a);
+    this.player.bodyShape = this.add.rectangle(0, 0, 30, 40, 0xcbd5e1);
+    this.player.chest = this.add.rectangle(0, -2, 20, 25, 0xe5e7eb);
+    this.player.blueCloth = this.add.rectangle(0, 14, 18, 12, 0x2563eb);
+
+    this.player.headOutline = this.add.circle(0, -28, 18, 0x0f172a);
+    this.player.helmet = this.add.circle(0, -28, 15, 0x94a3b8);
+    this.player.eye = this.add.rectangle(2, -29, 16, 3, 0x111827);
+    this.player.goldTrim = this.add.rectangle(0, -42, 20, 4, 0xfacc15);
+
+    this.player.shield = this.add.rectangle(-24, 4, 14, 30, 0x1d4ed8);
+    this.player.shieldBorder = this.add.rectangle(-24, 4, 18, 34, 0xcbd5e1);
+    this.player.shieldBorder.setDepth(-1);
+
+    this.player.sword = this.add.rectangle(25, -1, 7, 35, 0xe5e7eb);
+    this.player.swordHandle = this.add.rectangle(25, 20, 12, 5, 0x78350f);
 
     this.player.add([
       this.player.shadow,
+      this.player.cape,
+      this.player.shieldBorder,
+      this.player.shield,
       this.player.outline,
       this.player.bodyShape,
+      this.player.chest,
+      this.player.blueCloth,
       this.player.headOutline,
-      this.player.head,
+      this.player.helmet,
+      this.player.eye,
+      this.player.goldTrim,
       this.player.sword,
+      this.player.swordHandle,
     ]);
 
     this.physics.add.existing(this.player);
-    this.player.body.setSize(28, 38);
-    this.player.body.setOffset(-14, -20);
+    this.player.body.setSize(32, 42);
+    this.player.body.setOffset(-16, -21);
     this.player.body.setCollideWorldBounds(true);
 
-    this.playerLabel = this.add.text(this.player.x - 22, this.player.y - 60, "Hero", {
-      fontSize: "13px",
+    this.playerLabel = this.add.text(this.player.x - 40, this.player.y - 70, "Player Knight", {
+      fontSize: "11px",
       color: "#ffffff",
       fontFamily: "monospace",
+      stroke: "#000000",
+      strokeThickness: 3,
     });
   }
+
 
   createNPCs() {
     this.npcs = [
@@ -374,7 +401,7 @@ export default class WorldScene extends Phaser.Scene {
         role: "knight",
       },
       "Ally Archer": {
-        color: 0xfacc15,
+        color: 0x16a34a,
         hp: 90,
         damage: 9,
         range: 330,
@@ -390,7 +417,7 @@ export default class WorldScene extends Phaser.Scene {
         role: "castleArcher",
       },
       "Healer": {
-        color: 0x22c55e,
+        color: 0xf8fafc,
         hp: 95,
         damage: 0,
         range: 230,
@@ -401,28 +428,101 @@ export default class WorldScene extends Phaser.Scene {
 
     const ally = this.add.container(x, y);
 
-    ally.shadow = this.add.ellipse(0, 23, 36, 12, 0x000000, 0.28);
+    ally.shadow = this.add.ellipse(0, 25, 40, 13, 0x000000, 0.3);
+
+    // Common body foundation.
     ally.outline = this.add.rectangle(0, 0, 36, 44, 0x0f172a);
     ally.bodyShape = this.add.rectangle(0, 0, 30, 38, config.color);
-    ally.headOutline = this.add.circle(0, -24, 16, 0x0f172a);
-    ally.head = this.add.circle(0, -24, 13, 0xfde68a);
+    ally.headOutline = this.add.circle(0, -25, 16, 0x0f172a);
+    ally.head = this.add.circle(0, -25, 13, 0xfde68a);
 
-    if (config.role === "archer" || config.role === "castleArcher") {
-      ally.weapon = this.add.arc(20, 0, 18, 250, 110, false, 0x7c2d12);
-    } else if (config.role === "healer") {
-      ally.weapon = this.add.circle(20, 0, 8, 0xa7f3d0);
-    } else {
-      ally.weapon = this.add.rectangle(21, 0, 8, 32, 0xcbd5e1);
+    ally.add([ally.shadow]);
+
+    if (config.role === "knight") {
+      // Ally Knight: gray armor, blue team cloth, smaller than hero.
+      ally.armor = this.add.rectangle(0, -2, 26, 34, 0x94a3b8);
+      ally.blueBand = this.add.rectangle(0, 12, 22, 8, 0x2563eb);
+      ally.helmet = this.add.circle(0, -25, 13, 0x64748b);
+      ally.eye = this.add.rectangle(2, -26, 13, 3, 0x111827);
+      ally.shield = this.add.rectangle(-22, 5, 12, 25, 0x78350f);
+      ally.weapon = this.add.rectangle(22, 2, 7, 30, 0xcbd5e1);
+
+      ally.add([
+        ally.outline,
+        ally.armor,
+        ally.blueBand,
+        ally.headOutline,
+        ally.helmet,
+        ally.eye,
+        ally.shield,
+        ally.weapon,
+      ]);
     }
 
-    ally.add([
-      ally.shadow,
-      ally.outline,
-      ally.bodyShape,
-      ally.headOutline,
-      ally.head,
-      ally.weapon,
-    ]);
+    if (config.role === "archer") {
+      // Ally Archer: hood, leather, clear bow silhouette.
+      ally.hood = this.add.circle(0, -25, 15, 0x166534);
+      ally.face = this.add.circle(2, -23, 9, 0xfde68a);
+      ally.leather = this.add.rectangle(0, 2, 26, 34, 0x92400e);
+      ally.belt = this.add.rectangle(0, 10, 28, 4, 0x78350f);
+      ally.quiver = this.add.rectangle(-18, -2, 7, 26, 0x7c2d12);
+      ally.bow = this.add.arc(23, 0, 24, 250, 110, false, 0x7c2d12);
+      ally.arrow = this.add.rectangle(22, -2, 26, 2, 0xe5e7eb);
+
+      ally.add([
+        ally.outline,
+        ally.leather,
+        ally.belt,
+        ally.quiver,
+        ally.headOutline,
+        ally.hood,
+        ally.face,
+        ally.bow,
+        ally.arrow,
+      ]);
+    }
+
+    if (config.role === "castleArcher") {
+      // Castle Archer: partly hidden behind stone wall.
+      ally.wall = this.add.rectangle(0, 12, 44, 30, 0x94a3b8);
+      ally.wallTop = this.add.rectangle(0, -4, 48, 12, 0xcbd5e1);
+      ally.hood = this.add.circle(0, -24, 13, 0x475569);
+      ally.face = this.add.circle(2, -22, 8, 0xfde68a);
+      ally.bow = this.add.arc(22, -8, 22, 250, 110, false, 0x7c2d12);
+      ally.flag = this.add.triangle(-20, -30, -4, -39, -4, -21, 0x2563eb);
+
+      ally.add([
+        ally.wall,
+        ally.wallTop,
+        ally.headOutline,
+        ally.hood,
+        ally.face,
+        ally.bow,
+        ally.flag,
+      ]);
+    }
+
+    if (config.role === "healer") {
+      // Healer: robe + glowing staff.
+      ally.robeOutline = this.add.rectangle(0, 4, 34, 44, 0x0f172a);
+      ally.robe = this.add.rectangle(0, 4, 28, 40, 0xf8fafc);
+      ally.blueScarf = this.add.rectangle(0, -6, 24, 5, 0x2563eb);
+      ally.hood = this.add.circle(0, -25, 14, 0xfef3c7);
+      ally.staff = this.add.rectangle(23, -2, 5, 48, 0x78350f);
+      ally.crystal = this.add.circle(23, -31, 9, 0x22c55e);
+      ally.glow = this.add.circle(23, -31, 15, 0x22c55e, 0.2);
+
+      ally.add([
+        ally.robeOutline,
+        ally.robe,
+        ally.blueScarf,
+        ally.headOutline,
+        ally.hood,
+        ally.staff,
+        ally.glow,
+        ally.crystal,
+      ]);
+    }
 
     this.physics.add.existing(ally);
     ally.body.setSize(30, 38);
@@ -448,7 +548,7 @@ export default class WorldScene extends Phaser.Scene {
     ally.wanderY = y;
     ally.nextWander = 0;
 
-    const label = this.add.text(x - 42, y - 64, type, {
+    ally.nameLabel = this.add.text(x - 42, y - 66, type, {
       fontSize: "11px",
       color: "#ffffff",
       fontFamily: "monospace",
@@ -456,11 +556,8 @@ export default class WorldScene extends Phaser.Scene {
       strokeThickness: 3,
     });
 
-    ally.nameLabel = label;
-
-    // Health bar: red base, green current HP.
-    ally.hpBack = this.add.rectangle(x, y - 46, 44, 7, 0x7f1d1d);
-    ally.hpBar = this.add.rectangle(x, y - 46, 42, 5, 0x22c55e);
+    ally.hpBack = this.add.rectangle(x, y - 48, 48, 8, 0x7f1d1d);
+    ally.hpBar = this.add.rectangle(x, y - 48, 46, 6, 0x22c55e);
 
     this.allies.add(ally);
   }
@@ -747,36 +844,142 @@ export default class WorldScene extends Phaser.Scene {
     const enemyType = isBoss ? "Troll Boss" : Phaser.Math.RND.pick(availableTypes);
 
     const enemy = this.add.container(x, y);
-    enemy.shadow = this.add.ellipse(0, 24, 34, 12, 0x000000, 0.3);
+    enemy.shadow = this.add.ellipse(0, 28, 42, 14, 0x000000, 0.34);
 
     const stats = this.getEnemyStats(enemyType);
 
-    enemy.outline = this.add.rectangle(0, 0, stats.sizeW + 7, stats.sizeH + 7, 0x0f172a);
-    enemy.bodyShape = this.add.rectangle(0, 0, stats.sizeW, stats.sizeH, stats.color);
-    enemy.headOutline = this.add.circle(0, -stats.sizeH / 2 - 7, stats.headSize + 3, 0x0f172a);
-    enemy.head = this.add.circle(0, -stats.sizeH / 2 - 7, stats.headSize, stats.headColor);
+    enemy.add([enemy.shadow]);
 
-    if (stats.isRanged) {
-      enemy.weapon = this.add.arc(20, 0, 18, 250, 110, false, 0x7c2d12);
-    } else if (enemyType === "Armored Orc") {
-      enemy.weapon = this.add.rectangle(22, 2, 10, 36, 0xe5e7eb);
-      enemy.shield = this.add.rectangle(-18, 2, 10, 28, 0x64748b);
-    } else if (enemyType === "Troll Boss") {
-      enemy.weapon = this.add.rectangle(34, 2, 14, 54, 0x78350f);
-    } else {
-      enemy.weapon = this.add.rectangle(21, 1, 8, 30, 0x9ca3af);
+    if (enemyType === "Goblin") {
+      // Goblin: small green body, pointy ears, dagger.
+      enemy.earL = this.add.triangle(-15, -25, -29, -31, -17, -16, 0x365314);
+      enemy.earR = this.add.triangle(15, -25, 29, -31, 17, -16, 0x365314);
+      enemy.bodyOutline = this.add.rectangle(0, 4, 33, 35, 0x0f172a);
+      enemy.bodyShape = this.add.rectangle(0, 4, 27, 29, 0x84cc16);
+      enemy.headOutline = this.add.circle(0, -24, 18, 0x0f172a);
+      enemy.head = this.add.circle(0, -24, 15, 0x65a30d);
+      enemy.eyeL = this.add.circle(-5, -26, 2, 0xfacc15);
+      enemy.eyeR = this.add.circle(5, -26, 2, 0xfacc15);
+      enemy.weapon = this.add.rectangle(20, 6, 6, 22, 0x9ca3af);
+
+      enemy.add([
+        enemy.earL,
+        enemy.earR,
+        enemy.bodyOutline,
+        enemy.bodyShape,
+        enemy.headOutline,
+        enemy.head,
+        enemy.eyeL,
+        enemy.eyeR,
+        enemy.weapon,
+      ]);
     }
 
-    enemy.add([
-      enemy.shadow,
-      enemy.outline,
-      enemy.bodyShape,
-      enemy.headOutline,
-      enemy.head,
-    ]);
+    if (enemyType === "Orc Warrior") {
+      // Orc Warrior: top-heavy, weapon-focused.
+      enemy.bodyOutline = this.add.rectangle(0, 0, 42, 48, 0x0f172a);
+      enemy.bodyShape = this.add.rectangle(0, 0, 36, 42, 0x166534);
+      enemy.armor = this.add.rectangle(0, 4, 32, 22, 0x78350f);
+      enemy.redCloth = this.add.rectangle(0, 18, 28, 6, 0xb91c1c);
+      enemy.headOutline = this.add.circle(0, -30, 18, 0x0f172a);
+      enemy.head = this.add.circle(0, -30, 15, 0x365314);
+      enemy.tuskL = this.add.rectangle(-7, -18, 4, 7, 0xf8fafc);
+      enemy.tuskR = this.add.rectangle(7, -18, 4, 7, 0xf8fafc);
+      enemy.weapon = this.add.rectangle(27, 0, 9, 38, 0xcbd5e1);
 
-    if (enemy.shield) enemy.add(enemy.shield);
-    if (enemy.weapon) enemy.add(enemy.weapon);
+      enemy.add([
+        enemy.bodyOutline,
+        enemy.bodyShape,
+        enemy.armor,
+        enemy.redCloth,
+        enemy.headOutline,
+        enemy.head,
+        enemy.tuskL,
+        enemy.tuskR,
+        enemy.weapon,
+      ]);
+    }
+
+    if (enemyType === "Orc Archer") {
+      // Orc Archer: hunched ranged unit with crude bow.
+      enemy.bodyOutline = this.add.rectangle(0, 2, 36, 42, 0x0f172a);
+      enemy.bodyShape = this.add.rectangle(0, 2, 30, 36, 0x7c2d12);
+      enemy.leather = this.add.rectangle(0, 5, 26, 24, 0x92400e);
+      enemy.headOutline = this.add.circle(0, -28, 16, 0x0f172a);
+      enemy.head = this.add.circle(0, -28, 13, 0x365314);
+      enemy.tusk = this.add.rectangle(6, -17, 4, 6, 0xf8fafc);
+      enemy.quiver = this.add.rectangle(-17, 0, 7, 28, 0x451a03);
+      enemy.weapon = this.add.arc(24, 0, 25, 250, 110, false, 0x451a03);
+      enemy.arrow = this.add.rectangle(23, -2, 28, 2, 0x111827);
+
+      enemy.add([
+        enemy.bodyOutline,
+        enemy.bodyShape,
+        enemy.leather,
+        enemy.headOutline,
+        enemy.head,
+        enemy.tusk,
+        enemy.quiver,
+        enemy.weapon,
+        enemy.arrow,
+      ]);
+    }
+
+    if (enemyType === "Armored Orc") {
+      // Armored Orc: bulky, dark metal armor, shield.
+      enemy.bodyOutline = this.add.rectangle(0, 2, 50, 56, 0x0f172a);
+      enemy.bodyShape = this.add.rectangle(0, 2, 44, 50, 0x64748b);
+      enemy.armorHighlight = this.add.rectangle(0, -4, 34, 20, 0x94a3b8);
+      enemy.headOutline = this.add.circle(0, -34, 19, 0x0f172a);
+      enemy.helmet = this.add.circle(0, -34, 16, 0x475569);
+      enemy.jaw = this.add.rectangle(0, -22, 20, 8, 0x365314);
+      enemy.eye = this.add.rectangle(2, -36, 15, 3, 0xef4444);
+      enemy.shield = this.add.rectangle(-26, 4, 13, 34, 0x334155);
+      enemy.weapon = this.add.rectangle(30, 2, 10, 42, 0xe5e7eb);
+
+      enemy.add([
+        enemy.bodyOutline,
+        enemy.bodyShape,
+        enemy.armorHighlight,
+        enemy.headOutline,
+        enemy.helmet,
+        enemy.jaw,
+        enemy.eye,
+        enemy.shield,
+        enemy.weapon,
+      ]);
+    }
+
+    if (enemyType === "Troll Boss") {
+      // Troll Boss: huge, hunched, club, red eyes.
+      enemy.bodyOutline = this.add.rectangle(0, 6, 78, 88, 0x0f172a);
+      enemy.bodyShape = this.add.rectangle(0, 6, 70, 80, 0x166534);
+      enemy.belly = this.add.ellipse(0, 18, 48, 42, 0x14532d);
+      enemy.headOutline = this.add.circle(0, -48, 31, 0x0f172a);
+      enemy.head = this.add.circle(0, -48, 27, 0x365314);
+      enemy.eyeL = this.add.circle(-10, -52, 4, 0xef4444);
+      enemy.eyeR = this.add.circle(10, -52, 4, 0xef4444);
+      enemy.tuskL = this.add.rectangle(-10, -31, 5, 12, 0xf8fafc);
+      enemy.tuskR = this.add.rectangle(10, -31, 5, 12, 0xf8fafc);
+      enemy.club = this.add.rectangle(42, 0, 16, 64, 0x78350f);
+      enemy.clubHead = this.add.rectangle(42, -33, 28, 22, 0x451a03);
+      enemy.chain = this.add.rectangle(0, -8, 50, 5, 0x64748b);
+
+      enemy.add([
+        enemy.bodyOutline,
+        enemy.bodyShape,
+        enemy.belly,
+        enemy.headOutline,
+        enemy.head,
+        enemy.eyeL,
+        enemy.eyeR,
+        enemy.tuskL,
+        enemy.tuskR,
+        enemy.club,
+        enemy.clubHead,
+        enemy.chain,
+      ]);
+    }
 
     this.physics.add.existing(enemy);
     enemy.body.setSize(stats.sizeW, stats.sizeH);
@@ -802,7 +1005,7 @@ export default class WorldScene extends Phaser.Scene {
     enemy.wanderX = 0;
     enemy.wanderY = 0;
 
-    enemy.nameLabel = this.add.text(enemy.x - 42, enemy.y - 66, enemyType, {
+    enemy.nameLabel = this.add.text(enemy.x - 45, enemy.y - 72, enemyType, {
       fontSize: enemy.isBoss ? "13px" : "10px",
       color: enemy.isBoss ? "#facc15" : "#ffffff",
       fontFamily: "monospace",
@@ -810,9 +1013,8 @@ export default class WorldScene extends Phaser.Scene {
       strokeThickness: 3,
     });
 
-    // Health bar: red base, green current HP.
-    enemy.hpBack = this.add.rectangle(enemy.x, enemy.y - 50, 50, 7, 0x7f1d1d);
-    enemy.hpBar = this.add.rectangle(enemy.x, enemy.y - 50, 48, 5, 0x22c55e);
+    enemy.hpBack = this.add.rectangle(enemy.x, enemy.y - 54, 54, 8, 0x7f1d1d);
+    enemy.hpBar = this.add.rectangle(enemy.x, enemy.y - 54, 52, 6, 0x22c55e);
 
     this.enemies.add(enemy);
   }
@@ -1933,17 +2135,15 @@ export default class WorldScene extends Phaser.Scene {
     if (!ally.hpBar || !ally.hpBack) return;
 
     ally.hpBack.x = ally.x;
-    ally.hpBack.y = ally.y - 46;
+    ally.hpBack.y = ally.y - 50;
 
     ally.hpBar.x = ally.x;
-    ally.hpBar.y = ally.y - 46;
+    ally.hpBar.y = ally.y - 50;
 
     const ratio = Phaser.Math.Clamp(ally.hp / ally.maxHp, 0, 1);
-    ally.hpBar.width = Math.max(0, 42 * ratio);
+    ally.hpBar.width = Math.max(0, 46 * ratio);
 
-    if (ally.hp <= 0) {
-      ally.hpBar.width = 0;
-    }
+    if (ally.hp <= 0) ally.hpBar.width = 0;
   }
 
 
@@ -2259,21 +2459,19 @@ export default class WorldScene extends Phaser.Scene {
     if (!enemy.hpBar || !enemy.hpBack) return;
 
     enemy.hpBack.x = enemy.x;
-    enemy.hpBack.y = enemy.y - 52;
+    enemy.hpBack.y = enemy.y - 56;
 
     enemy.hpBar.x = enemy.x;
-    enemy.hpBar.y = enemy.y - 52;
+    enemy.hpBar.y = enemy.y - 56;
 
     const ratio = Phaser.Math.Clamp(enemy.hp / enemy.maxHp, 0, 1);
-    enemy.hpBar.width = Math.max(0, 48 * ratio);
+    enemy.hpBar.width = Math.max(0, 52 * ratio);
 
-    if (enemy.hp <= 0) {
-      enemy.hpBar.width = 0;
-    }
+    if (enemy.hp <= 0) enemy.hpBar.width = 0;
 
     if (enemy.nameLabel) {
-      enemy.nameLabel.x = enemy.x - 42;
-      enemy.nameLabel.y = enemy.y - 70;
+      enemy.nameLabel.x = enemy.x - 45;
+      enemy.nameLabel.y = enemy.y - 75;
     }
   }
 
