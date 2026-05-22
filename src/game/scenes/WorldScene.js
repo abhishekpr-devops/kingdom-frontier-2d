@@ -646,52 +646,79 @@ export default class WorldScene extends Phaser.Scene {
   createPlayer() {
     this.player = this.add.container(520, 545);
 
-    // Player Knight: silver armor + blue cloth + shield + sword + cape.
-    this.player.shadow = this.add.ellipse(0, 27, 44, 14, 0x000000, 0.32);
+    // V0.22 Player Knight model: clearer heroic silhouette.
+    this.player.shadow = this.add.ellipse(0, 30, 52, 16, 0x000000, 0.34);
 
-    this.player.cape = this.add.rectangle(-12, 4, 18, 42, 0x1d4ed8);
-    this.player.cape.setAlpha(0.9);
+    // Cape behind body
+    this.player.capeBack = this.add.rectangle(-15, 5, 24, 50, 0x1d4ed8, 0.9);
+    this.player.capeBack.setAngle(-5);
 
-    this.player.outline = this.add.rectangle(0, 0, 38, 46, 0x0f172a);
-    this.player.bodyShape = this.add.rectangle(0, 0, 30, 40, 0xcbd5e1);
-    this.player.chest = this.add.rectangle(0, -2, 20, 25, 0xe5e7eb);
-    this.player.blueCloth = this.add.rectangle(0, 14, 18, 12, 0x2563eb);
+    // Shield behind front arm
+    this.player.shieldOuter = this.add.rectangle(-27, 3, 20, 36, 0x0f172a);
+    this.player.shieldInner = this.add.rectangle(-27, 3, 15, 31, 0x2563eb);
+    this.player.shieldGem = this.add.circle(-27, 0, 4, 0xfacc15);
 
-    this.player.headOutline = this.add.circle(0, -28, 18, 0x0f172a);
-    this.player.helmet = this.add.circle(0, -28, 15, 0x94a3b8);
-    this.player.eye = this.add.rectangle(2, -29, 16, 3, 0x111827);
-    this.player.goldTrim = this.add.rectangle(0, -42, 20, 4, 0xfacc15);
+    // Armor
+    this.player.bodyOutline = this.add.rectangle(0, 0, 40, 50, 0x0f172a);
+    this.player.bodyShape = this.add.rectangle(0, 0, 32, 42, 0xcbd5e1);
+    this.player.chestPlate = this.add.rectangle(0, -6, 24, 25, 0xe5e7eb);
+    this.player.blueTabard = this.add.rectangle(0, 12, 20, 22, 0x2563eb);
+    this.player.goldEmblem = this.add.circle(0, -3, 4, 0xfacc15);
 
-    this.player.shield = this.add.rectangle(-24, 4, 14, 30, 0x1d4ed8);
-    this.player.shieldBorder = this.add.rectangle(-24, 4, 18, 34, 0xcbd5e1);
-    this.player.shieldBorder.setDepth(-1);
+    // Shoulders and arms
+    this.player.leftShoulder = this.add.circle(-18, -13, 9, 0x94a3b8);
+    this.player.rightShoulder = this.add.circle(18, -13, 9, 0x94a3b8);
+    this.player.leftBoot = this.add.rectangle(-8, 27, 9, 13, 0x334155);
+    this.player.rightBoot = this.add.rectangle(8, 27, 9, 13, 0x334155);
 
-    this.player.sword = this.add.rectangle(25, -1, 7, 35, 0xe5e7eb);
-    this.player.swordHandle = this.add.rectangle(25, 20, 12, 5, 0x78350f);
+    // Helmet
+    this.player.headOutline = this.add.circle(0, -31, 19, 0x0f172a);
+    this.player.helmet = this.add.circle(0, -31, 16, 0x94a3b8);
+    this.player.helmetTop = this.add.rectangle(0, -45, 25, 5, 0xfacc15);
+    this.player.eyeSlot = this.add.rectangle(2, -32, 18, 4, 0x020617);
+    this.player.facePixel = this.add.rectangle(0, -23, 12, 5, 0xfde68a);
+
+    // Sword
+    this.player.swordBlade = this.add.rectangle(28, -3, 7, 42, 0xf8fafc);
+    this.player.swordEdge = this.add.rectangle(31, -3, 2, 40, 0x93c5fd);
+    this.player.swordGuard = this.add.rectangle(28, 18, 18, 5, 0xfacc15);
+    this.player.swordHandle = this.add.rectangle(28, 26, 7, 13, 0x78350f);
 
     this.player.add([
       this.player.shadow,
-      this.player.cape,
-      this.player.shieldBorder,
-      this.player.shield,
-      this.player.outline,
+      this.player.capeBack,
+      this.player.shieldOuter,
+      this.player.shieldInner,
+      this.player.shieldGem,
+      this.player.bodyOutline,
       this.player.bodyShape,
-      this.player.chest,
-      this.player.blueCloth,
+      this.player.chestPlate,
+      this.player.blueTabard,
+      this.player.goldEmblem,
+      this.player.leftShoulder,
+      this.player.rightShoulder,
+      this.player.leftBoot,
+      this.player.rightBoot,
       this.player.headOutline,
       this.player.helmet,
-      this.player.eye,
-      this.player.goldTrim,
-      this.player.sword,
+      this.player.helmetTop,
+      this.player.eyeSlot,
+      this.player.facePixel,
+      this.player.swordBlade,
+      this.player.swordEdge,
+      this.player.swordGuard,
       this.player.swordHandle,
     ]);
 
+    // Keep backward compatibility with existing attack/flash code.
+    this.player.sword = this.player.swordBlade;
+
     this.physics.add.existing(this.player);
-    this.player.body.setSize(32, 42);
-    this.player.body.setOffset(-16, -21);
+    this.player.body.setSize(34, 44);
+    this.player.body.setOffset(-17, -22);
     this.player.body.setCollideWorldBounds(true);
 
-    this.playerLabel = this.add.text(this.player.x - 40, this.player.y - 70, "Player Knight", {
+    this.playerLabel = this.add.text(this.player.x - 43, this.player.y - 74, "Player Knight", {
       fontSize: "11px",
       color: "#ffffff",
       fontFamily: "monospace",
@@ -796,105 +823,144 @@ export default class WorldScene extends Phaser.Scene {
 
     const ally = this.add.container(x, y);
 
-    ally.shadow = this.add.ellipse(0, 25, 40, 13, 0x000000, 0.3);
-
-    // Common body foundation.
-    ally.outline = this.add.rectangle(0, 0, 36, 44, 0x0f172a);
-    ally.bodyShape = this.add.rectangle(0, 0, 30, 38, config.color);
-    ally.headOutline = this.add.circle(0, -25, 16, 0x0f172a);
-    ally.head = this.add.circle(0, -25, 13, 0xfde68a);
-
+    ally.shadow = this.add.ellipse(0, 28, 46, 14, 0x000000, 0.28);
     ally.add([ally.shadow]);
 
     if (config.role === "knight") {
-      // Ally Knight: gray armor, blue team cloth, smaller than hero.
-      ally.armor = this.add.rectangle(0, -2, 26, 34, 0x94a3b8);
-      ally.blueBand = this.add.rectangle(0, 12, 22, 8, 0x2563eb);
-      ally.helmet = this.add.circle(0, -25, 13, 0x64748b);
-      ally.eye = this.add.rectangle(2, -26, 13, 3, 0x111827);
-      ally.shield = this.add.rectangle(-22, 5, 12, 25, 0x78350f);
-      ally.weapon = this.add.rectangle(22, 2, 7, 30, 0xcbd5e1);
+      // Ally Knight: compact frontline soldier.
+      ally.cape = this.add.rectangle(-10, 6, 16, 38, 0x1e40af, 0.55);
+      ally.bodyOutline = this.add.rectangle(0, 0, 36, 45, 0x0f172a);
+      ally.armor = this.add.rectangle(0, 0, 30, 39, 0x94a3b8);
+      ally.chest = this.add.rectangle(0, -4, 22, 23, 0xcbd5e1);
+      ally.blueBand = this.add.rectangle(0, 13, 22, 9, 0x2563eb);
+      ally.shoulderL = this.add.circle(-17, -12, 8, 0x64748b);
+      ally.shoulderR = this.add.circle(17, -12, 8, 0x64748b);
+      ally.bootL = this.add.rectangle(-7, 25, 8, 12, 0x334155);
+      ally.bootR = this.add.rectangle(7, 25, 8, 12, 0x334155);
+      ally.headOutline = this.add.circle(0, -27, 16, 0x0f172a);
+      ally.helmet = this.add.circle(0, -27, 13, 0x64748b);
+      ally.eye = this.add.rectangle(2, -28, 14, 3, 0x020617);
+      ally.shield = this.add.rectangle(-24, 4, 13, 28, 0x78350f);
+      ally.shieldRim = this.add.rectangle(-24, 4, 16, 31, 0xcbd5e1);
+      ally.weapon = this.add.rectangle(23, 1, 7, 32, 0xe5e7eb);
 
       ally.add([
-        ally.outline,
+        ally.cape,
+        ally.shieldRim,
+        ally.shield,
+        ally.bodyOutline,
         ally.armor,
+        ally.chest,
         ally.blueBand,
+        ally.shoulderL,
+        ally.shoulderR,
+        ally.bootL,
+        ally.bootR,
         ally.headOutline,
         ally.helmet,
         ally.eye,
-        ally.shield,
         ally.weapon,
       ]);
     }
 
     if (config.role === "archer") {
-      // Ally Archer: hood, leather, clear bow silhouette.
-      ally.hood = this.add.circle(0, -25, 15, 0x166534);
-      ally.face = this.add.circle(2, -23, 9, 0xfde68a);
-      ally.leather = this.add.rectangle(0, 2, 26, 34, 0x92400e);
-      ally.belt = this.add.rectangle(0, 10, 28, 4, 0x78350f);
-      ally.quiver = this.add.rectangle(-18, -2, 7, 26, 0x7c2d12);
-      ally.bow = this.add.arc(23, 0, 24, 250, 110, false, 0x7c2d12);
-      ally.arrow = this.add.rectangle(22, -2, 26, 2, 0xe5e7eb);
+      // Ally Archer: readable bow + quiver silhouette.
+      ally.bodyOutline = this.add.rectangle(0, 3, 34, 42, 0x0f172a);
+      ally.leather = this.add.rectangle(0, 3, 28, 36, 0x92400e);
+      ally.greenCloak = this.add.rectangle(-6, 5, 24, 39, 0x166534, 0.85);
+      ally.belt = this.add.rectangle(0, 11, 30, 4, 0xfacc15);
+      ally.bootL = this.add.rectangle(-7, 26, 7, 11, 0x451a03);
+      ally.bootR = this.add.rectangle(7, 26, 7, 11, 0x451a03);
+      ally.quiver = this.add.rectangle(-20, -2, 8, 31, 0x7c2d12);
+      ally.arrowTips = this.add.rectangle(-20, -20, 12, 5, 0xe5e7eb);
+      ally.headOutline = this.add.circle(0, -27, 17, 0x0f172a);
+      ally.hood = this.add.circle(0, -27, 14, 0x15803d);
+      ally.face = this.add.circle(3, -25, 8, 0xfde68a);
+      ally.weapon = this.add.arc(25, 1, 26, 250, 110, false, 0x7c2d12);
+      ally.arrow = this.add.rectangle(24, -2, 30, 2, 0xf8fafc);
 
       ally.add([
-        ally.outline,
+        ally.bodyOutline,
+        ally.greenCloak,
         ally.leather,
         ally.belt,
+        ally.bootL,
+        ally.bootR,
         ally.quiver,
+        ally.arrowTips,
         ally.headOutline,
         ally.hood,
         ally.face,
-        ally.bow,
+        ally.weapon,
         ally.arrow,
       ]);
     }
 
     if (config.role === "castleArcher") {
-      // Castle Archer: partly hidden behind stone wall.
-      ally.wall = this.add.rectangle(0, 12, 44, 30, 0x94a3b8);
-      ally.wallTop = this.add.rectangle(0, -4, 48, 12, 0xcbd5e1);
-      ally.hood = this.add.circle(0, -24, 13, 0x475569);
-      ally.face = this.add.circle(2, -22, 8, 0xfde68a);
-      ally.bow = this.add.arc(22, -8, 22, 250, 110, false, 0x7c2d12);
-      ally.flag = this.add.triangle(-20, -30, -4, -39, -4, -21, 0x2563eb);
+      // Castle Archer: tower-defense look, partly behind battlement.
+      ally.wallShadow = this.add.ellipse(0, 25, 58, 13, 0x000000, 0.15);
+      ally.wall = this.add.rectangle(0, 15, 54, 34, 0x94a3b8);
+      ally.wallTop = this.add.rectangle(0, -4, 60, 14, 0xcbd5e1);
+      ally.brick1 = this.add.rectangle(-15, 13, 20, 5, 0x64748b, 0.5);
+      ally.brick2 = this.add.rectangle(16, 25, 22, 5, 0x64748b, 0.5);
+      ally.headOutline = this.add.circle(0, -25, 15, 0x0f172a);
+      ally.helmet = this.add.circle(0, -25, 12, 0x475569);
+      ally.face = this.add.circle(3, -23, 8, 0xfde68a);
+      ally.weapon = this.add.arc(25, -7, 24, 250, 110, false, 0x7c2d12);
+      ally.arrow = this.add.rectangle(25, -9, 28, 2, 0xf8fafc);
+      ally.flagPole = this.add.rectangle(-29, -28, 4, 36, 0x111827);
+      ally.flag = this.add.triangle(-11, -33, -27, -43, -27, -23, 0x2563eb);
 
       ally.add([
+        ally.wallShadow,
         ally.wall,
         ally.wallTop,
+        ally.brick1,
+        ally.brick2,
         ally.headOutline,
-        ally.hood,
+        ally.helmet,
         ally.face,
-        ally.bow,
+        ally.weapon,
+        ally.arrow,
+        ally.flagPole,
         ally.flag,
       ]);
     }
 
     if (config.role === "healer") {
-      // Healer: robe + glowing staff.
-      ally.robeOutline = this.add.rectangle(0, 4, 34, 44, 0x0f172a);
-      ally.robe = this.add.rectangle(0, 4, 28, 40, 0xf8fafc);
-      ally.blueScarf = this.add.rectangle(0, -6, 24, 5, 0x2563eb);
-      ally.hood = this.add.circle(0, -25, 14, 0xfef3c7);
-      ally.staff = this.add.rectangle(23, -2, 5, 48, 0x78350f);
-      ally.crystal = this.add.circle(23, -31, 9, 0x22c55e);
-      ally.glow = this.add.circle(23, -31, 15, 0x22c55e, 0.2);
+      // Healer: robe + staff + glow, easy to identify as support.
+      ally.robeOutline = this.add.rectangle(0, 5, 38, 48, 0x0f172a);
+      ally.robe = this.add.rectangle(0, 5, 31, 43, 0xf8fafc);
+      ally.robeShade = this.add.rectangle(-8, 6, 8, 38, 0xe5e7eb);
+      ally.blueScarf = this.add.rectangle(0, -7, 27, 6, 0x2563eb);
+      ally.goldBelt = this.add.rectangle(0, 11, 27, 4, 0xfacc15);
+      ally.headOutline = this.add.circle(0, -28, 17, 0x0f172a);
+      ally.hood = this.add.circle(0, -28, 14, 0xfef3c7);
+      ally.face = this.add.circle(2, -26, 8, 0xfde68a);
+      ally.weapon = this.add.rectangle(25, -2, 5, 52, 0x78350f);
+      ally.staffTop = this.add.circle(25, -34, 11, 0x22c55e);
+      ally.staffCore = this.add.circle(25, -34, 5, 0xf0fdf4);
+      ally.glow = this.add.circle(25, -34, 20, 0x22c55e, 0.16);
 
       ally.add([
         ally.robeOutline,
         ally.robe,
+        ally.robeShade,
         ally.blueScarf,
+        ally.goldBelt,
         ally.headOutline,
         ally.hood,
-        ally.staff,
+        ally.face,
+        ally.weapon,
         ally.glow,
-        ally.crystal,
+        ally.staffTop,
+        ally.staffCore,
       ]);
     }
 
     this.physics.add.existing(ally);
-    ally.body.setSize(30, 38);
-    ally.body.setOffset(-15, -19);
+    ally.body.setSize(32, 40);
+    ally.body.setOffset(-16, -20);
     ally.body.setCollideWorldBounds(true);
 
     ally.type = type;
@@ -916,7 +982,7 @@ export default class WorldScene extends Phaser.Scene {
     ally.wanderY = y;
     ally.nextWander = 0;
 
-    ally.nameLabel = this.add.text(x - 42, y - 66, type, {
+    ally.nameLabel = this.add.text(x - 42, y - 68, type, {
       fontSize: "11px",
       color: "#ffffff",
       fontFamily: "monospace",
@@ -924,8 +990,8 @@ export default class WorldScene extends Phaser.Scene {
       strokeThickness: 3,
     });
 
-    ally.hpBack = this.add.rectangle(x, y - 48, 48, 8, 0x7f1d1d);
-    ally.hpBar = this.add.rectangle(x, y - 48, 46, 6, 0x22c55e);
+    ally.hpBack = this.add.rectangle(x, y - 50, 50, 8, 0x7f1d1d);
+    ally.hpBar = this.add.rectangle(x, y - 50, 48, 6, 0x22c55e);
 
     this.allies.add(ally);
   }
@@ -1308,140 +1374,186 @@ export default class WorldScene extends Phaser.Scene {
     const enemyType = isBoss ? "Troll Boss" : Phaser.Math.RND.pick(availableTypes);
 
     const enemy = this.add.container(x, y);
-    enemy.shadow = this.add.ellipse(0, 28, 42, 14, 0x000000, 0.34);
+    enemy.shadow = this.add.ellipse(0, 30, 48, 16, 0x000000, 0.36);
 
     const stats = this.getEnemyStats(enemyType);
 
     enemy.add([enemy.shadow]);
 
     if (enemyType === "Goblin") {
-      // Goblin: small green body, pointy ears, dagger.
-      enemy.earL = this.add.triangle(-15, -25, -29, -31, -17, -16, 0x365314);
-      enemy.earR = this.add.triangle(15, -25, 29, -31, 17, -16, 0x365314);
-      enemy.bodyOutline = this.add.rectangle(0, 4, 33, 35, 0x0f172a);
-      enemy.bodyShape = this.add.rectangle(0, 4, 27, 29, 0x84cc16);
-      enemy.headOutline = this.add.circle(0, -24, 18, 0x0f172a);
-      enemy.head = this.add.circle(0, -24, 15, 0x65a30d);
-      enemy.eyeL = this.add.circle(-5, -26, 2, 0xfacc15);
-      enemy.eyeR = this.add.circle(5, -26, 2, 0xfacc15);
-      enemy.weapon = this.add.rectangle(20, 6, 6, 22, 0x9ca3af);
+      // Goblin: small, hunched, pointy ears.
+      enemy.earL = this.add.triangle(-16, -25, -33, -33, -18, -15, 0x365314);
+      enemy.earR = this.add.triangle(16, -25, 33, -33, 18, -15, 0x365314);
+      enemy.bodyOutline = this.add.rectangle(0, 5, 34, 36, 0x0f172a);
+      enemy.bodyShape = this.add.rectangle(0, 5, 28, 30, 0x84cc16);
+      enemy.hunch = this.add.rectangle(-4, -2, 25, 15, 0x65a30d);
+      enemy.headOutline = this.add.circle(0, -24, 19, 0x0f172a);
+      enemy.head = this.add.circle(0, -24, 16, 0x65a30d);
+      enemy.eyeL = this.add.circle(-6, -27, 2, 0xfacc15);
+      enemy.eyeR = this.add.circle(6, -27, 2, 0xfacc15);
+      enemy.mouth = this.add.rectangle(0, -17, 10, 2, 0x111827);
+      enemy.weapon = this.add.rectangle(21, 7, 5, 24, 0x9ca3af);
+      enemy.rag = this.add.rectangle(0, 18, 21, 7, 0x78350f);
 
       enemy.add([
         enemy.earL,
         enemy.earR,
         enemy.bodyOutline,
         enemy.bodyShape,
+        enemy.hunch,
+        enemy.rag,
         enemy.headOutline,
         enemy.head,
         enemy.eyeL,
         enemy.eyeR,
+        enemy.mouth,
         enemy.weapon,
       ]);
     }
 
     if (enemyType === "Orc Warrior") {
-      // Orc Warrior: top-heavy, weapon-focused.
-      enemy.bodyOutline = this.add.rectangle(0, 0, 42, 48, 0x0f172a);
-      enemy.bodyShape = this.add.rectangle(0, 0, 36, 42, 0x166534);
-      enemy.armor = this.add.rectangle(0, 4, 32, 22, 0x78350f);
-      enemy.redCloth = this.add.rectangle(0, 18, 28, 6, 0xb91c1c);
-      enemy.headOutline = this.add.circle(0, -30, 18, 0x0f172a);
-      enemy.head = this.add.circle(0, -30, 15, 0x365314);
-      enemy.tuskL = this.add.rectangle(-7, -18, 4, 7, 0xf8fafc);
-      enemy.tuskR = this.add.rectangle(7, -18, 4, 7, 0xf8fafc);
-      enemy.weapon = this.add.rectangle(27, 0, 9, 38, 0xcbd5e1);
+      // Orc Warrior: strong melee enemy, red cloth and large weapon.
+      enemy.bodyOutline = this.add.rectangle(0, 2, 46, 52, 0x0f172a);
+      enemy.bodyShape = this.add.rectangle(0, 2, 38, 44, 0x166534);
+      enemy.armor = this.add.rectangle(0, 1, 34, 26, 0x78350f);
+      enemy.armorPlate = this.add.rectangle(0, -5, 25, 14, 0x64748b);
+      enemy.redCloth = this.add.rectangle(0, 20, 30, 7, 0xb91c1c);
+      enemy.shoulderL = this.add.circle(-21, -11, 10, 0x451a03);
+      enemy.shoulderR = this.add.circle(21, -11, 10, 0x451a03);
+      enemy.headOutline = this.add.circle(0, -32, 20, 0x0f172a);
+      enemy.head = this.add.circle(0, -32, 16, 0x365314);
+      enemy.brow = this.add.rectangle(0, -37, 22, 5, 0x111827);
+      enemy.tuskL = this.add.rectangle(-8, -20, 4, 8, 0xf8fafc);
+      enemy.tuskR = this.add.rectangle(8, -20, 4, 8, 0xf8fafc);
+      enemy.weapon = this.add.rectangle(29, 0, 10, 42, 0xcbd5e1);
+      enemy.weaponHead = this.add.rectangle(29, -24, 22, 12, 0x9ca3af);
 
       enemy.add([
         enemy.bodyOutline,
         enemy.bodyShape,
         enemy.armor,
+        enemy.armorPlate,
         enemy.redCloth,
+        enemy.shoulderL,
+        enemy.shoulderR,
         enemy.headOutline,
         enemy.head,
+        enemy.brow,
         enemy.tuskL,
         enemy.tuskR,
         enemy.weapon,
+        enemy.weaponHead,
       ]);
     }
 
     if (enemyType === "Orc Archer") {
-      // Orc Archer: hunched ranged unit with crude bow.
-      enemy.bodyOutline = this.add.rectangle(0, 2, 36, 42, 0x0f172a);
-      enemy.bodyShape = this.add.rectangle(0, 2, 30, 36, 0x7c2d12);
-      enemy.leather = this.add.rectangle(0, 5, 26, 24, 0x92400e);
-      enemy.headOutline = this.add.circle(0, -28, 16, 0x0f172a);
-      enemy.head = this.add.circle(0, -28, 13, 0x365314);
-      enemy.tusk = this.add.rectangle(6, -17, 4, 6, 0xf8fafc);
-      enemy.quiver = this.add.rectangle(-17, 0, 7, 28, 0x451a03);
-      enemy.weapon = this.add.arc(24, 0, 25, 250, 110, false, 0x451a03);
-      enemy.arrow = this.add.rectangle(23, -2, 28, 2, 0x111827);
+      // Orc Archer: hunched ranged enemy, crude bow and quiver.
+      enemy.bodyOutline = this.add.rectangle(0, 3, 38, 45, 0x0f172a);
+      enemy.bodyShape = this.add.rectangle(0, 3, 32, 39, 0x7c2d12);
+      enemy.leather = this.add.rectangle(0, 5, 28, 25, 0x92400e);
+      enemy.redBand = this.add.rectangle(0, 17, 27, 5, 0xb91c1c);
+      enemy.quiver = this.add.rectangle(-19, 0, 8, 32, 0x451a03);
+      enemy.arrowTips = this.add.rectangle(-19, -20, 13, 5, 0x111827);
+      enemy.headOutline = this.add.circle(0, -29, 17, 0x0f172a);
+      enemy.head = this.add.circle(0, -29, 14, 0x365314);
+      enemy.eye = this.add.rectangle(3, -31, 12, 3, 0xef4444);
+      enemy.tusk = this.add.rectangle(7, -18, 4, 6, 0xf8fafc);
+      enemy.weapon = this.add.arc(26, 0, 27, 250, 110, false, 0x451a03);
+      enemy.arrow = this.add.rectangle(26, -3, 31, 3, 0x111827);
 
       enemy.add([
         enemy.bodyOutline,
         enemy.bodyShape,
         enemy.leather,
+        enemy.redBand,
+        enemy.quiver,
+        enemy.arrowTips,
         enemy.headOutline,
         enemy.head,
+        enemy.eye,
         enemy.tusk,
-        enemy.quiver,
         enemy.weapon,
         enemy.arrow,
       ]);
     }
 
     if (enemyType === "Armored Orc") {
-      // Armored Orc: bulky, dark metal armor, shield.
-      enemy.bodyOutline = this.add.rectangle(0, 2, 50, 56, 0x0f172a);
-      enemy.bodyShape = this.add.rectangle(0, 2, 44, 50, 0x64748b);
-      enemy.armorHighlight = this.add.rectangle(0, -4, 34, 20, 0x94a3b8);
-      enemy.headOutline = this.add.circle(0, -34, 19, 0x0f172a);
-      enemy.helmet = this.add.circle(0, -34, 16, 0x475569);
-      enemy.jaw = this.add.rectangle(0, -22, 20, 8, 0x365314);
-      enemy.eye = this.add.rectangle(2, -36, 15, 3, 0xef4444);
-      enemy.shield = this.add.rectangle(-26, 4, 13, 34, 0x334155);
-      enemy.weapon = this.add.rectangle(30, 2, 10, 42, 0xe5e7eb);
+      // Armored Orc: tank silhouette, shield, helmet, heavy blade.
+      enemy.bodyOutline = this.add.rectangle(0, 4, 56, 62, 0x0f172a);
+      enemy.bodyShape = this.add.rectangle(0, 4, 48, 55, 0x64748b);
+      enemy.armorHighlight = this.add.rectangle(0, -8, 38, 21, 0x94a3b8);
+      enemy.rust1 = this.add.rectangle(-11, 3, 7, 20, 0x92400e, 0.7);
+      enemy.rust2 = this.add.rectangle(12, 12, 8, 17, 0x92400e, 0.6);
+      enemy.headOutline = this.add.circle(0, -39, 21, 0x0f172a);
+      enemy.helmet = this.add.circle(0, -39, 17, 0x475569);
+      enemy.spikeL = this.add.triangle(-16, -50, -27, -61, -12, -54, 0xcbd5e1);
+      enemy.spikeR = this.add.triangle(16, -50, 27, -61, 12, -54, 0xcbd5e1);
+      enemy.jaw = this.add.rectangle(0, -25, 22, 9, 0x365314);
+      enemy.eye = this.add.rectangle(2, -41, 16, 3, 0xef4444);
+      enemy.shield = this.add.rectangle(-31, 5, 16, 40, 0x334155);
+      enemy.shieldMark = this.add.rectangle(-31, 5, 7, 30, 0x94a3b8);
+      enemy.weapon = this.add.rectangle(34, 3, 11, 48, 0xe5e7eb);
+      enemy.weaponHead = this.add.rectangle(34, -24, 20, 15, 0xcbd5e1);
 
       enemy.add([
         enemy.bodyOutline,
         enemy.bodyShape,
         enemy.armorHighlight,
+        enemy.rust1,
+        enemy.rust2,
         enemy.headOutline,
         enemy.helmet,
+        enemy.spikeL,
+        enemy.spikeR,
         enemy.jaw,
         enemy.eye,
         enemy.shield,
+        enemy.shieldMark,
         enemy.weapon,
+        enemy.weaponHead,
       ]);
     }
 
     if (enemyType === "Troll Boss") {
-      // Troll Boss: huge, hunched, club, red eyes.
-      enemy.bodyOutline = this.add.rectangle(0, 6, 78, 88, 0x0f172a);
-      enemy.bodyShape = this.add.rectangle(0, 6, 70, 80, 0x166534);
-      enemy.belly = this.add.ellipse(0, 18, 48, 42, 0x14532d);
-      enemy.headOutline = this.add.circle(0, -48, 31, 0x0f172a);
-      enemy.head = this.add.circle(0, -48, 27, 0x365314);
-      enemy.eyeL = this.add.circle(-10, -52, 4, 0xef4444);
-      enemy.eyeR = this.add.circle(10, -52, 4, 0xef4444);
-      enemy.tuskL = this.add.rectangle(-10, -31, 5, 12, 0xf8fafc);
-      enemy.tuskR = this.add.rectangle(10, -31, 5, 12, 0xf8fafc);
-      enemy.club = this.add.rectangle(42, 0, 16, 64, 0x78350f);
-      enemy.clubHead = this.add.rectangle(42, -33, 28, 22, 0x451a03);
-      enemy.chain = this.add.rectangle(0, -8, 50, 5, 0x64748b);
+      // Troll Boss: huge, readable, dangerous.
+      enemy.bodyOutline = this.add.rectangle(0, 8, 86, 98, 0x0f172a);
+      enemy.bodyShape = this.add.rectangle(0, 8, 76, 88, 0x166534);
+      enemy.belly = this.add.ellipse(0, 21, 54, 48, 0x14532d);
+      enemy.backSpikes1 = this.add.triangle(-30, -20, -48, -32, -31, -3, 0x64748b);
+      enemy.backSpikes2 = this.add.triangle(-35, 6, -56, -3, -36, 25, 0x64748b);
+      enemy.headOutline = this.add.circle(0, -52, 34, 0x0f172a);
+      enemy.head = this.add.circle(0, -52, 29, 0x365314);
+      enemy.brow = this.add.rectangle(0, -63, 42, 7, 0x111827);
+      enemy.eyeL = this.add.circle(-11, -54, 4, 0xef4444);
+      enemy.eyeR = this.add.circle(11, -54, 4, 0xef4444);
+      enemy.nose = this.add.rectangle(0, -45, 9, 11, 0x14532d);
+      enemy.tuskL = this.add.rectangle(-11, -32, 5, 13, 0xf8fafc);
+      enemy.tuskR = this.add.rectangle(11, -32, 5, 13, 0xf8fafc);
+      enemy.chain = this.add.rectangle(0, -11, 56, 6, 0x64748b);
+      enemy.club = this.add.rectangle(47, 3, 17, 70, 0x78350f);
+      enemy.clubHead = this.add.rectangle(47, -37, 32, 26, 0x451a03);
+      enemy.clubSpike1 = this.add.circle(35, -43, 3, 0xe5e7eb);
+      enemy.clubSpike2 = this.add.circle(58, -43, 3, 0xe5e7eb);
 
       enemy.add([
+        enemy.backSpikes1,
+        enemy.backSpikes2,
         enemy.bodyOutline,
         enemy.bodyShape,
         enemy.belly,
         enemy.headOutline,
         enemy.head,
+        enemy.brow,
         enemy.eyeL,
         enemy.eyeR,
+        enemy.nose,
         enemy.tuskL,
         enemy.tuskR,
+        enemy.chain,
         enemy.club,
         enemy.clubHead,
-        enemy.chain,
+        enemy.clubSpike1,
+        enemy.clubSpike2,
       ]);
     }
 
@@ -1468,11 +1580,11 @@ export default class WorldScene extends Phaser.Scene {
     enemy.nextWander = 0;
     enemy.wanderX = 0;
     enemy.wanderY = 0;
-    enemy.lane = lane ?? Phaser.Math.RND.pick(this.enemyLanes);
+    enemy.lane = lane ?? Phaser.Math.RND.pick(this.enemyLanes ?? []);
     enemy.laneReached = false;
-    enemy.castleAttackPoint = Phaser.Math.RND.pick(this.castleAttackPoints);
+    enemy.castleAttackPoint = Phaser.Math.RND.pick(this.castleAttackPoints ?? [this.castleGatePoint]);
 
-    enemy.nameLabel = this.add.text(enemy.x - 45, enemy.y - 72, enemyType, {
+    enemy.nameLabel = this.add.text(enemy.x - 45, enemy.y - 76, enemyType, {
       fontSize: enemy.isBoss ? "13px" : "10px",
       color: enemy.isBoss ? "#facc15" : "#ffffff",
       fontFamily: "monospace",
@@ -1480,8 +1592,8 @@ export default class WorldScene extends Phaser.Scene {
       strokeThickness: 3,
     });
 
-    enemy.hpBack = this.add.rectangle(enemy.x, enemy.y - 54, 54, 8, 0x7f1d1d);
-    enemy.hpBar = this.add.rectangle(enemy.x, enemy.y - 54, 52, 6, 0x22c55e);
+    enemy.hpBack = this.add.rectangle(enemy.x, enemy.y - 58, 56, 8, 0x7f1d1d);
+    enemy.hpBar = this.add.rectangle(enemy.x, enemy.y - 58, 54, 6, 0x22c55e);
 
     this.enemies.add(enemy);
   }
