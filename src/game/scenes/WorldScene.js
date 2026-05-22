@@ -8,7 +8,6 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   create() {
-    this.gameVersion = "v0.13";
     this.worldW = 1800;
     this.worldH = 1100;
 
@@ -26,7 +25,6 @@ export default class WorldScene extends Phaser.Scene {
     this.isPaused = false;
     this.gameEnded = false;
     this.mainMenuOpen = true;
-    this.loadingOpen = false;
     this.soundEnabled = true;
     this.lastSavedText = "Never";
 
@@ -606,8 +604,6 @@ export default class WorldScene extends Phaser.Scene {
       O: Phaser.Input.Keyboard.KeyCodes.O,
       N: Phaser.Input.Keyboard.KeyCodes.N,
       M: Phaser.Input.Keyboard.KeyCodes.M,
-      X: Phaser.Input.Keyboard.KeyCodes.X,
-      ENTER: Phaser.Input.Keyboard.KeyCodes.ENTER,
     });
   }
 
@@ -779,15 +775,15 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   createMainMenu() {
-    this.menuOverlay = this.add.rectangle(480, 270, 960, 540, 0x020617, 0.88);
+    this.menuOverlay = this.add.rectangle(480, 270, 960, 540, 0x020617, 0.86);
     this.menuOverlay.setScrollFactor(0);
     this.menuOverlay.setDepth(20000);
 
-    this.menuPanel = this.add.rectangle(480, 270, 660, 360, 0x111827, 0.97);
+    this.menuPanel = this.add.rectangle(480, 270, 620, 320, 0x111827, 0.96);
     this.menuPanel.setScrollFactor(0);
     this.menuPanel.setDepth(20001);
 
-    this.menuTitle = this.add.text(480, 140, "KINGDOM FRONTIER 2D", {
+    this.menuTitle = this.add.text(480, 165, "KINGDOM FRONTIER 2D", {
       fontSize: "34px",
       color: "#facc15",
       fontFamily: "monospace",
@@ -798,17 +794,7 @@ export default class WorldScene extends Phaser.Scene {
     this.menuTitle.setScrollFactor(0);
     this.menuTitle.setDepth(20002);
 
-    this.versionText = this.add.text(480, 176, this.gameVersion, {
-      fontSize: "16px",
-      color: "#93c5fd",
-      fontFamily: "monospace",
-      align: "center",
-    });
-    this.versionText.setOrigin(0.5);
-    this.versionText.setScrollFactor(0);
-    this.versionText.setDepth(20002);
-
-    this.menuText = this.add.text(480, 295, "", {
+    this.menuText = this.add.text(480, 280, "", {
       fontSize: "18px",
       color: "#ffffff",
       fontFamily: "monospace",
@@ -825,22 +811,16 @@ export default class WorldScene extends Phaser.Scene {
   updateMainMenuText() {
     if (!this.menuText) return;
 
-    const hasSave = localStorage.getItem(SAVE_KEY) ? "YES" : "NO";
-
     this.menuText.setText(
       [
-        "N / ENTER  New Game",
-        "L          Load Game",
-        "X          Delete Save",
-        `M          Sound: ${this.soundEnabled ? "ON" : "OFF"}`,
-        "",
-        `Save Found: ${hasSave}`,
+        "N  New Game",
+        "L  Load Game",
+        `M  Sound: ${this.soundEnabled ? "ON" : "OFF"}`,
         "",
         "Goal: defend the castle and survive waves.",
       ].join("\n")
     );
   }
-
 
   hideMainMenu() {
     this.mainMenuOpen = false;
@@ -849,7 +829,6 @@ export default class WorldScene extends Phaser.Scene {
       this.menuOverlay,
       this.menuPanel,
       this.menuTitle,
-      this.versionText,
       this.menuText,
     ]) {
       if (item) item.setVisible(false);
@@ -859,52 +838,6 @@ export default class WorldScene extends Phaser.Scene {
     this.physics.world.resume();
     this.showMessage("Game started. Press H for controls.");
   }
-
-  showLoadingScreen(nextAction) {
-    if (this.loadingOpen) return;
-
-    this.loadingOpen = true;
-
-    this.loadingOverlay = this.add.rectangle(480, 270, 960, 540, 0x020617, 0.92);
-    this.loadingOverlay.setScrollFactor(0);
-    this.loadingOverlay.setDepth(21000);
-
-    this.loadingText = this.add.text(480, 250, "LOADING...", {
-      fontSize: "34px",
-      color: "#facc15",
-      fontFamily: "monospace",
-      fontStyle: "bold",
-    });
-    this.loadingText.setOrigin(0.5);
-    this.loadingText.setScrollFactor(0);
-    this.loadingText.setDepth(21001);
-
-    this.loadingSubText = this.add.text(480, 305, "Preparing battlefield", {
-      fontSize: "16px",
-      color: "#ffffff",
-      fontFamily: "monospace",
-    });
-    this.loadingSubText.setOrigin(0.5);
-    this.loadingSubText.setScrollFactor(0);
-    this.loadingSubText.setDepth(21001);
-
-    this.tweens.add({
-      targets: this.loadingText,
-      alpha: 0.35,
-      yoyo: true,
-      repeat: 2,
-      duration: 280,
-      onComplete: () => {
-        if (this.loadingOverlay) this.loadingOverlay.destroy();
-        if (this.loadingText) this.loadingText.destroy();
-        if (this.loadingSubText) this.loadingSubText.destroy();
-
-        this.loadingOpen = false;
-        nextAction();
-      },
-    });
-  }
-
 
   spawnWave() {
     if (this.waveCooldown) return;
@@ -1261,24 +1194,14 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   handleMainMenuHotkeys() {
-    if (Phaser.Input.Keyboard.JustDown(this.keys.N) || Phaser.Input.Keyboard.JustDown(this.keys.ENTER)) {
+    if (Phaser.Input.Keyboard.JustDown(this.keys.N)) {
       this.playSound("wave");
-
-      this.showLoadingScreen(() => {
-        this.hideMainMenu();
-      });
+      this.hideMainMenu();
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.keys.L)) {
-      this.showLoadingScreen(() => {
-        this.loadGame();
-        this.hideMainMenu();
-      });
-    }
-
-    if (Phaser.Input.Keyboard.JustDown(this.keys.X)) {
-      this.deleteSave();
-      this.updateMainMenuText();
+      this.loadGame();
+      this.hideMainMenu();
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.keys.M)) {
@@ -1287,7 +1210,6 @@ export default class WorldScene extends Phaser.Scene {
       this.showMessage(`Sound ${this.soundEnabled ? "enabled" : "disabled"}.`);
     }
   }
-
 
   handleHotkeys(time) {
     if (Phaser.Input.Keyboard.JustDown(this.keys.ESC)) {
@@ -1304,10 +1226,6 @@ export default class WorldScene extends Phaser.Scene {
       this.soundEnabled = !this.soundEnabled;
       this.showMessage(`Sound ${this.soundEnabled ? "ON" : "OFF"}.`);
       this.updateHelpPanel();
-    }
-
-    if (Phaser.Input.Keyboard.JustDown(this.keys.X)) {
-      this.deleteSave();
     }
 
     if (this.isPaused) {
@@ -2002,11 +1920,11 @@ export default class WorldScene extends Phaser.Scene {
     overlay.setScrollFactor(0);
     overlay.setDepth(10000);
 
-    const panel = this.add.rectangle(480, 270, 650, 270, 0x111827, 0.96);
+    const panel = this.add.rectangle(480, 270, 620, 250, 0x111827, 0.96);
     panel.setScrollFactor(0);
     panel.setDepth(10001);
 
-    const title = this.add.text(480, 195, "GAME OVER", {
+    const title = this.add.text(480, 205, "GAME OVER", {
       fontSize: "44px",
       color: "#ef4444",
       fontFamily: "monospace",
@@ -2016,7 +1934,7 @@ export default class WorldScene extends Phaser.Scene {
     title.setScrollFactor(0);
     title.setDepth(10002);
 
-    const body = this.add.text(480, 288, "The hero has fallen.\nPress ENTER to restart.\nTip: Use potions with U before HP reaches 0.", {
+    const body = this.add.text(480, 285, "The hero has fallen.\nRefresh the browser to restart.\nTip: Use potions with U before HP reaches 0.", {
       fontSize: "20px",
       color: "#ffffff",
       align: "center",
@@ -2026,12 +1944,1019 @@ export default class WorldScene extends Phaser.Scene {
     body.setOrigin(0.5);
     body.setScrollFactor(0);
     body.setDepth(10002);
+  }
 
-    this.input.keyboard.once("keydown-ENTER", () => {
-      window.location.reload();
+  killEnemy(enemy) {
+    if (!enemy || !enemy.active) return;
+
+    this.playerStats.gold += enemy.gold;
+    this.playSound("coin");
+    this.playerStats.xp += 10;
+    this.playerStats.kills += 1;
+
+    this.updateQuestProgress("kill5", this.playerStats.kills);
+
+    if (enemy.isBoss) {
+      this.playerStats.bossKills += 1;
+      this.updateQuestProgress("boss1", this.playerStats.bossKills);
+    }
+
+    this.dropLoot(enemy);
+
+    if (this.playerStats.xp >= this.playerStats.level * 80) {
+      this.playerStats.xp = 0;
+      this.playerStats.level += 1;
+      this.playerStats.maxHp += 10;
+      this.playerStats.hp = this.playerStats.maxHp;
+      this.playerStats.damage += 4;
+      this.showMessage(`Level up. You are now level ${this.playerStats.level}.`);
+    }
+
+    this.showFloatingText(enemy.x, enemy.y - 35, `+${enemy.gold} gold`, "#facc15");
+
+    if (enemy.hpBar) enemy.hpBar.destroy();
+    if (enemy.hpBack) enemy.hpBack.destroy();
+    if (enemy.nameLabel) enemy.nameLabel.destroy();
+
+    const death = this.add.circle(enemy.x, enemy.y, enemy.isBoss ? 38 : 18, 0xffffff, 0.25);
+
+    this.tweens.add({
+      targets: death,
+      scale: enemy.isBoss ? 3 : 2,
+      alpha: 0,
+      duration: enemy.isBoss ? 600 : 250,
+      onComplete: () => death.destroy(),
+    });
+
+    this.animateDeath(enemy);
+  }
+
+
+  dropLoot(enemy) {
+    const lootTable = {
+      Goblin: ["goblinCoin"],
+      "Orc Warrior": ["orcTooth"],
+      "Orc Archer": ["orcTooth", "goblinCoin"],
+      "Armored Orc": ["orcTooth", "trollBone"],
+      "Troll Boss": ["orcTooth", "trollBone", "magicCrystal"],
+    };
+
+    const possible = lootTable[enemy.enemyType] ?? ["goblinCoin"];
+    const count = enemy.isBoss ? 4 : 1;
+
+    for (let i = 0; i < count; i++) {
+      if (!enemy.isBoss && Math.random() > 0.7) continue;
+
+      const type = Phaser.Math.RND.pick(possible);
+      const x = enemy.x + Phaser.Math.Between(-20, 20);
+      const y = enemy.y + Phaser.Math.Between(-20, 20);
+
+      const color = type === "magicCrystal"
+        ? 0xa78bfa
+        : type === "wolfFur"
+          ? 0xcbd5e1
+          : type === "trollBone"
+            ? 0xe5e7eb
+            : 0xfacc15;
+
+      const loot = this.add.circle(x, y, 9, color);
+      this.physics.add.existing(loot);
+
+      loot.lootType = type;
+      loot.label = this.add.text(x - 18, y - 25, this.shortLootName(type), {
+        fontSize: "10px",
+        color: "#ffffff",
+        fontFamily: "monospace",
+      });
+
+      this.lootDrops.add(loot);
+    }
+  }
+
+
+  collectLoot(loot) {
+    if (!loot.active) return;
+
+    const type = loot.lootType;
+    this.playerStats.loot[type] = (this.playerStats.loot[type] ?? 0) + 1;
+
+    this.showFloatingText(loot.x, loot.y - 10, `Picked ${this.shortLootName(type)}`, "#facc15");
+
+    if (loot.label) loot.label.destroy();
+    loot.destroy();
+    this.updatePanels();
+  }
+
+  shortLootName(type) {
+    const names = {
+      goblinCoin: "Coin",
+      wolfFur: "Fur",
+      orcTooth: "Tooth",
+      trollBone: "Bone",
+      magicCrystal: "Crystal",
+    };
+
+    return names[type] ?? type;
+  }
+
+  talkToNPC() {
+    let nearestNPC = null;
+    let nearestDistance = Infinity;
+
+    this.npcs.forEach((npc) => {
+      const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, npc.x, npc.y);
+
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestNPC = npc;
+      }
+    });
+
+    if (nearestNPC && nearestDistance < 90) {
+      this.showMessage(nearestNPC.dialogue);
+    } else {
+      this.showMessage("No NPC nearby.");
+    }
+  }
+
+  isNearShopNPC() {
+    return this.npcs.some((npc) => {
+      const isShopNPC = npc.name === "Merchant" || npc.name === "Blacksmith";
+      if (!isShopNPC) return false;
+
+      const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, npc.x, npc.y);
+      return distance < 120;
     });
   }
 
+  isNearCastleGate() {
+    const distance = Phaser.Math.Distance.Between(
+      this.player.x,
+      this.player.y,
+      this.castleGatePoint.x,
+      this.castleGatePoint.y
+    );
+
+    return distance < 145;
+  }
+
+  buyPotion() {
+    if (!this.isNearShopNPC()) {
+      this.showMessage("You moved away from the shop NPC.");
+      this.shopOpen = false;
+      this.updatePanels();
+      return;
+    }
+
+    if (this.playerStats.gold < 20) {
+      this.showMessage("Not enough gold. Potion costs 20.");
+      return;
+    }
+
+    this.playerStats.gold -= 20;
+    this.playerStats.potions += 1;
+    this.playSound("coin");
+    this.showMessage("Bought 1 health potion.");
+    this.updatePanels();
+  }
+
+  upgradeSword() {
+    if (!this.isNearShopNPC()) {
+      this.showMessage("You moved away from the shop NPC.");
+      this.shopOpen = false;
+      this.updatePanels();
+      return;
+    }
+
+    const cost = 60 + this.playerStats.swordLevel * 25;
+
+    if (this.playerStats.gold < cost) {
+      this.showMessage(`Not enough gold. Sword upgrade costs ${cost}.`);
+      return;
+    }
+
+    this.playerStats.gold -= cost;
+    this.playerStats.swordLevel += 1;
+    this.playSound("upgrade");
+    this.playerStats.damage += 8;
+    this.player.sword.setFillStyle(0xfacc15);
+
+    this.updateQuestProgress("upgrade1", 1);
+    this.showMessage(`Sword upgraded to level ${this.playerStats.swordLevel}.`);
+    this.updatePanels();
+  }
+
+  usePotion() {
+    if (this.playerStats.potions <= 0) {
+      this.showMessage("No health potions left.");
+      return;
+    }
+
+    if (this.playerStats.hp >= this.playerStats.maxHp) {
+      this.showMessage("HP is already full.");
+      return;
+    }
+
+    this.playerStats.potions -= 1;
+    this.playerStats.hp = Math.min(this.playerStats.maxHp, this.playerStats.hp + 45);
+    this.playSound("upgrade");
+    this.showMessage("Used health potion. +45 HP.");
+    this.updatePanels();
+  }
+
+  repairCastle() {
+    if (!this.isNearCastleGate()) {
+      this.showMessage("Stand near the castle gate repair point to repair.");
+      return;
+    }
+
+    if (this.castleHealth >= this.maxCastleHealth) {
+      this.showMessage("Castle is already fully repaired.");
+      return;
+    }
+
+    if (this.playerStats.gold < 30) {
+      this.showMessage("Not enough gold. Castle repair costs 30.");
+      return;
+    }
+
+    this.playerStats.gold -= 30;
+    this.castleHealth = Math.min(this.maxCastleHealth, this.castleHealth + 90);
+    this.updateCastleDamageVisuals();
+    this.playSound("upgrade");
+
+    this.updateQuestProgress("repair1", 1);
+    this.showMessage("Castle repaired. +90 castle HP.");
+    this.updatePanels();
+  }
+
+  updateQuestProgress(id, value) {
+    const quest = this.quests.find((q) => q.id === id);
+    if (!quest || quest.done) return;
+
+    if (id === "kill5" || id === "survive3" || id === "boss1") {
+      quest.progress = Math.min(quest.target, value);
+    } else {
+      quest.progress = Math.min(quest.target, quest.progress + value);
+    }
+
+    if (quest.progress >= quest.target) {
+      quest.done = true;
+      this.playerStats.gold += quest.rewardGold;
+      this.playerStats.xp += quest.rewardXp;
+      this.showMessage(`Quest complete: ${quest.title}. Reward: ${quest.rewardGold} gold, ${quest.rewardXp} XP.`);
+    }
+
+    this.updatePanels();
+  }
+
+  saveGame() {
+    const saveData = {
+      wave: this.wave,
+      castleHealth: this.castleHealth,
+      maxCastleHealth: this.maxCastleHealth,
+      playerStats: this.playerStats,
+      playerPosition: {
+        x: this.player.x,
+        y: this.player.y,
+      },
+      quests: this.quests,
+      savedAt: new Date().toISOString(),
+    };
+
+    localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
+
+    this.lastSavedText = new Date(saveData.savedAt).toLocaleString();
+    this.showMessage("Game saved.");
+    this.updateUI();
+  }
+
+  loadGame() {
+    const raw = localStorage.getItem(SAVE_KEY);
+
+    if (!raw) {
+      this.showMessage("No save found. Press P first to save.");
+      return;
+    }
+
+    try {
+      const saveData = JSON.parse(raw);
+
+      this.wave = saveData.wave ?? 1;
+      this.castleHealth = saveData.castleHealth ?? 500;
+      this.maxCastleHealth = saveData.maxCastleHealth ?? 500;
+
+      this.playerStats = {
+        ...this.playerStats,
+        ...(saveData.playerStats ?? {}),
+        loot: {
+          ...this.playerStats.loot,
+          ...(saveData.playerStats?.loot ?? {}),
+        },
+      };
+
+      this.quests = saveData.quests ?? this.quests;
+
+      if (saveData.playerPosition) {
+        this.player.x = saveData.playerPosition.x ?? 520;
+        this.player.y = saveData.playerPosition.y ?? 545;
+      }
+
+      this.lastSavedText = saveData.savedAt ? new Date(saveData.savedAt).toLocaleString() : "Unknown";
+
+      this.clearEnemiesProjectilesLoot();
+      this.spawnWave();
+
+      this.showMessage("Game loaded. Active enemies reset for safety.");
+      this.updatePanels();
+      this.updateUI();
+    } catch (error) {
+      console.error(error);
+      this.showMessage("Save file is corrupted. Could not load.");
+    }
+  }
+
+  clearEnemiesProjectilesLoot() {
+    this.enemies.children.iterate((enemy) => {
+      if (!enemy) return;
+      if (enemy.hpBar) enemy.hpBar.destroy();
+      if (enemy.hpBack) enemy.hpBack.destroy();
+      enemy.destroy();
+    });
+
+    this.projectiles.children.iterate((projectile) => {
+      if (!projectile) return;
+      if (projectile.trail) projectile.trail.destroy();
+      projectile.destroy();
+    });
+
+    this.enemyProjectiles.children.iterate((projectile) => {
+      if (!projectile) return;
+      projectile.destroy();
+    });
+
+    this.lootDrops.children.iterate((loot) => {
+      if (!loot) return;
+      if (loot.label) loot.label.destroy();
+      loot.destroy();
+    });
+
+    this.enemies.clear(true, true);
+    this.projectiles.clear(true, true);
+    this.enemyProjectiles.clear(true, true);
+    this.lootDrops.clear(true, true);
+  }
+
+  damageAlly(ally, damage) {
+    if (!ally || !ally.active) return;
+
+    ally.hp -= damage;
+    this.showDamage(ally.x, ally.y, damage, "#ef4444");
+    this.playSound("hurt");
+
+    if (ally.hp <= 0) {
+      this.removeAlly(ally);
+    } else {
+      this.updateAllyHealthBar(ally);
+    }
+  }
+
+  removeAlly(ally) {
+    if (!ally || !ally.active) return;
+
+    this.showFloatingText(ally.x, ally.y - 30, `${ally.type} fell`, "#ef4444");
+
+    if (ally.hpBar) ally.hpBar.destroy();
+    if (ally.hpBack) ally.hpBack.destroy();
+    if (ally.nameLabel) ally.nameLabel.destroy();
+
+    const dust = this.add.circle(ally.x, ally.y, 22, 0xffffff, 0.25);
+    this.tweens.add({
+      targets: dust,
+      scale: 2,
+      alpha: 0,
+      duration: 280,
+      onComplete: () => dust.destroy(),
+    });
+
+    this.animateDeath(ally);
+  }
+
+
+  updateAllyHealthBar(ally) {
+    if (!ally.hpBar || !ally.hpBack) return;
+
+    ally.hpBack.x = ally.x;
+    ally.hpBack.y = ally.y - 50;
+
+    ally.hpBar.x = ally.x;
+    ally.hpBar.y = ally.y - 50;
+
+    const ratio = Phaser.Math.Clamp(ally.hp / ally.maxHp, 0, 1);
+    ally.hpBar.width = Math.max(0, 46 * ratio);
+
+    if (ally.hp <= 0) ally.hpBar.width = 0;
+  }
+
+
+  applyCastleDamage(amount) {
+    this.castleHealth = Math.max(0, this.castleHealth - amount);
+
+    this.playSound("castleHit");
+
+    if (this.time.now % 8 < 2) {
+      this.cameras.main.shake(55, 0.003);
+    }
+
+    this.showGateHitEffect();
+    this.updateCastleDamageVisuals();
+
+    if (this.castleHealth <= 0) {
+      this.gameOver();
+    }
+  }
+
+  createCastleDamageVisuals() {
+    this.castleCracks = [];
+    this.castleSmoke = [];
+
+    for (let i = 0; i < 5; i++) {
+      const crack = this.add.text(
+        Phaser.Math.Between(70, 175),
+        Phaser.Math.Between(365, 610),
+        "╱",
+        {
+          fontSize: "28px",
+          color: "#1f2937",
+          fontFamily: "monospace",
+        }
+      );
+
+      crack.setVisible(false);
+      this.castleCracks.push(crack);
+    }
+
+    for (let i = 0; i < 4; i++) {
+      const smoke = this.add.circle(
+        Phaser.Math.Between(90, 210),
+        Phaser.Math.Between(340, 620),
+        Phaser.Math.Between(10, 18),
+        0x6b7280,
+        0.32
+      );
+
+      smoke.setVisible(false);
+      this.castleSmoke.push(smoke);
+
+      this.tweens.add({
+        targets: smoke,
+        y: smoke.y - 22,
+        alpha: 0.08,
+        yoyo: true,
+        repeat: -1,
+        duration: Phaser.Math.Between(900, 1500),
+      });
+    }
+  }
+
+  updateCastleDamageVisuals() {
+    if (!this.castleCracks || !this.castleSmoke) return;
+
+    const hpPercent = this.castleHealth / this.maxCastleHealth;
+
+    this.castleCracks.forEach((crack, index) => {
+      crack.setVisible(hpPercent < 0.8 - index * 0.12);
+    });
+
+    this.castleSmoke.forEach((smoke, index) => {
+      smoke.setVisible(hpPercent < 0.55 - index * 0.09);
+    });
+  }
+
+  showGateHitEffect() {
+    const hit = this.add.circle(this.castleGatePoint.x, this.castleGatePoint.y, 18, 0xef4444, 0.32);
+
+    this.tweens.add({
+      targets: hit,
+      scale: 2.2,
+      alpha: 0,
+      duration: 180,
+      onComplete: () => hit.destroy(),
+    });
+  }
+
+  updateBossSpecials(enemy, time) {
+    if (!enemy.phaseTwo && enemy.hp <= enemy.maxHp * 0.5) {
+      enemy.phaseTwo = true;
+      enemy.speed += 8;
+      enemy.damage += 12;
+      enemy.bodyShape?.setFillStyle?.(0xb91c1c);
+      this.showMessage("Troll Boss enraged. Phase 2 started.");
+      this.cameras.main.shake(220, 0.012);
+      this.playSound("boss");
+    }
+
+    const stompDelay = enemy.phaseTwo ? 2800 : 4500;
+    const summonDelay = enemy.phaseTwo ? 6200 : 9000;
+
+    if (time > enemy.nextBossStomp) {
+      enemy.nextBossStomp = time + stompDelay;
+      this.bossStomp(enemy);
+    }
+
+    if (time > enemy.nextBossSummon) {
+      enemy.nextBossSummon = time + summonDelay;
+      this.bossSummon(enemy);
+    }
+  }
+
+
+  bossStomp(enemy) {
+    const radius = 150;
+
+    const ring = this.add.circle(enemy.x, enemy.y, radius, 0xef4444, 0.15);
+    ring.setDepth(90);
+
+    this.tweens.add({
+      targets: ring,
+      scale: 1.25,
+      alpha: 0,
+      duration: 450,
+      onComplete: () => ring.destroy(),
+    });
+
+    const playerDist = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y);
+    if (playerDist < radius) {
+      this.playerStats.hp -= 24;
+      this.showDamage(this.player.x, this.player.y, 24, "#ef4444");
+      this.cameras.main.shake(160, 0.009);
+
+      if (this.playerStats.hp <= 0) {
+        this.respawnPlayer();
+      }
+    }
+
+    this.allies.children.iterate((ally) => {
+      if (!ally || !ally.active) return;
+
+      const dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, ally.x, ally.y);
+      if (dist < radius) {
+        this.damageAlly(ally, 22);
+      }
+    });
+
+    this.playSound("boss");
+    this.showMessage("Boss stomp attack!");
+  }
+
+  bossSummon(enemy) {
+    for (let i = 0; i < 3; i++) {
+      this.spawnEnemy(
+        enemy.x + Phaser.Math.Between(-90, 90),
+        enemy.y + Phaser.Math.Between(-90, 90),
+        false
+      );
+    }
+
+    this.showMessage("Boss summoned minions!");
+    this.playSound("summon");
+  }
+
+  sellAllLoot() {
+    if (!this.isNearShopNPC()) {
+      this.showMessage("Stand near Merchant or Blacksmith to sell loot.");
+      this.shopOpen = false;
+      this.updatePanels();
+      return;
+    }
+
+    const loot = this.playerStats.loot;
+
+    const total =
+      loot.goblinCoin * 3 +
+      loot.wolfFur * 5 +
+      loot.orcTooth * 8 +
+      loot.trollBone * 14 +
+      loot.magicCrystal * 25;
+
+    if (total <= 0) {
+      this.showMessage("No loot to sell.");
+      return;
+    }
+
+    this.playerStats.gold += total;
+
+    loot.goblinCoin = 0;
+    loot.wolfFur = 0;
+    loot.orcTooth = 0;
+    loot.trollBone = 0;
+    loot.magicCrystal = 0;
+
+    this.showMessage(`Sold all loot for ${total} gold.`);
+    this.playSound("coin");
+    this.updatePanels();
+  }
+
+  buyUpgrade(type) {
+    const costs = {
+      hp: 70,
+      damage: 90,
+      castle: 120,
+      allies: 100,
+      tower: 150,
+    };
+
+    const cost = costs[type];
+
+    if (this.playerStats.gold < cost) {
+      this.showMessage(`Not enough gold. Need ${cost}.`);
+      return;
+    }
+
+    this.playerStats.gold -= cost;
+
+    if (type === "hp") {
+      this.playerStats.maxHp += 20;
+      this.playerStats.hp = this.playerStats.maxHp;
+      this.showMessage("Upgrade bought: Max HP +20.");
+    }
+
+    if (type === "damage") {
+      this.playerStats.damage += 8;
+      this.showMessage("Upgrade bought: Player damage +8.");
+    }
+
+    if (type === "castle") {
+      this.maxCastleHealth += 100;
+      this.castleHealth += 100;
+      this.showMessage("Upgrade bought: Castle max HP +100.");
+    }
+
+    if (type === "allies") {
+      this.playerStats.allyUpgradeLevel += 1;
+
+      this.allies.children.iterate((ally) => {
+        if (!ally || !ally.active) return;
+
+        ally.maxHp += 25;
+        ally.hp += 25;
+
+        if (ally.role !== "healer") {
+          ally.damage += 3;
+        }
+
+        this.updateAllyHealthBar(ally);
+      });
+
+      this.showMessage(`Ally units upgraded to Lv ${this.playerStats.allyUpgradeLevel}.`);
+    }
+
+    if (type === "tower") {
+      this.playerStats.castleArcherLevel += 1;
+
+      this.allies.children.iterate((ally) => {
+        if (!ally || !ally.active) return;
+
+        if (ally.role === "castleArcher") {
+          ally.damage += 5;
+          ally.range += 35;
+          ally.maxHp += 35;
+          ally.hp = ally.maxHp;
+          ally.bodyShape?.setFillStyle?.(0xfbbf24);
+          this.updateAllyHealthBar(ally);
+        }
+      });
+
+      this.showMessage(`Castle Archer tower upgraded to Lv ${this.playerStats.castleArcherLevel}.`);
+    }
+
+    this.playSound("upgrade");
+    this.updatePanels();
+  }
+
+
+  playSound(type) {
+    if (!this.soundEnabled) return;
+
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!this.audioCtx) {
+        this.audioCtx = new AudioContext();
+      }
+
+      const osc = this.audioCtx.createOscillator();
+      const gain = this.audioCtx.createGain();
+
+      const sounds = {
+        attack: [220, 0.04],
+        arrow: [520, 0.04],
+        hurt: [110, 0.06],
+        coin: [720, 0.05],
+        upgrade: [520, 0.08],
+        castleHit: [80, 0.05],
+        boss: [65, 0.16],
+        summon: [180, 0.12],
+        tick: [440, 0.03],
+        wave: [330, 0.08],
+        death: [140, 0.12],
+        heal: [620, 0.08],
+        gameOver: [60, 0.22],
+      };
+
+      const [freq, duration] = sounds[type] ?? [300, 0.05];
+
+      osc.frequency.value = freq;
+      gain.gain.value = 0.045;
+
+      osc.connect(gain);
+      gain.connect(this.audioCtx.destination);
+
+      osc.start();
+      osc.stop(this.audioCtx.currentTime + duration);
+    } catch {
+      // Browser may block sound until first user interaction.
+    }
+  }
+
+
+  getNearestEnemy(source) {
+    let nearestEnemy = null;
+    let nearestDistance = Infinity;
+
+    this.enemies.children.iterate((enemy) => {
+      if (!enemy || !enemy.active) return;
+
+      const distance = Phaser.Math.Distance.Between(source.x, source.y, enemy.x, enemy.y);
+
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestEnemy = enemy;
+      }
+    });
+
+    if (!nearestEnemy) return null;
+    return { enemy: nearestEnemy, distance: nearestDistance };
+  }
+
+  getNearestAlly(source) {
+    let nearestAlly = null;
+    let nearestDistance = Infinity;
+
+    this.allies.children.iterate((ally) => {
+      if (!ally || !ally.active) return;
+
+      const distance = Phaser.Math.Distance.Between(source.x, source.y, ally.x, ally.y);
+
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestAlly = ally;
+      }
+    });
+
+    if (!nearestAlly) return null;
+    return { ally: nearestAlly, distance: nearestDistance };
+  }
+
+  updateEnemyHealthBar(enemy) {
+    if (!enemy.hpBar || !enemy.hpBack) return;
+
+    enemy.hpBack.x = enemy.x;
+    enemy.hpBack.y = enemy.y - 56;
+
+    enemy.hpBar.x = enemy.x;
+    enemy.hpBar.y = enemy.y - 56;
+
+    const ratio = Phaser.Math.Clamp(enemy.hp / enemy.maxHp, 0, 1);
+    enemy.hpBar.width = Math.max(0, 52 * ratio);
+
+    if (enemy.hp <= 0) enemy.hpBar.width = 0;
+
+    if (enemy.nameLabel) {
+      enemy.nameLabel.x = enemy.x - 45;
+      enemy.nameLabel.y = enemy.y - 75;
+    }
+  }
+
+
+  updateLabels() {
+    this.playerLabel.x = this.player.x - 22;
+    this.playerLabel.y = this.player.y - 60;
+
+    this.allies.children.iterate((ally) => {
+      if (!ally || !ally.active) return;
+
+      if (ally.nameLabel) {
+        ally.nameLabel.x = ally.x - 42;
+        ally.nameLabel.y = ally.y - 64;
+      }
+
+      this.updateAllyHealthBar(ally);
+    });
+  }
+
+
+  updateUI() {
+    this.goldText.setText(
+      `HP:${Math.floor(this.playerStats.hp)}/${this.playerStats.maxHp}  ST:${Math.floor(this.playerStats.stamina)}  Gold:${this.playerStats.gold}  XP:${this.playerStats.xp}  Lv:${this.playerStats.level}  Wave:${this.wave}`
+    );
+
+    this.castleHpText.setText(
+      `Castle HP: ${Math.max(0, Math.floor(this.castleHealth))}/${this.maxCastleHealth}`
+    );
+
+    this.saveInfoText.setText(`Save: ${this.lastSavedText}`);
+  }
+
+  updateHelpPanel() {
+    if (!this.helpVisible) {
+      this.helpPanel.setVisible(true);
+      this.helpPanel.setText("H: Keys");
+      return;
+    }
+
+    this.helpPanel.setVisible(true);
+    this.helpPanel.setText(
+      [
+        "KEYS",
+        "WASD Move",
+        "Shift Run",
+        "Space Hit",
+        "E Talk",
+        "B Shop",
+        "I Bag",
+        "Q Quest",
+        "O Upgrades",
+        "M Sound",
+        "N New game menu",
+        "U Potion",
+        "R Repair",
+        "P Save",
+        "4 Sell loot",
+        "L Load",
+        "ESC Pause",
+        "H Hide",
+      ].join("\n")
+    );
+  }
+
+  updatePanels() {
+    if (this.shopOpen) {
+      const swordCost = 60 + this.playerStats.swordLevel * 25;
+
+      this.shopPanel.setVisible(true);
+      this.shopPanel.setText(
+        [
+          "SHOP",
+          "1 Potion: 20 gold",
+          `2 Sword upgrade: ${swordCost} gold`,
+          "3 Castle repair: 30 gold",
+          "4 Sell all loot",
+          "B Close shop",
+        ].join("\n")
+      );
+    } else {
+      this.shopPanel.setText("");
+      this.shopPanel.setVisible(false);
+    }
+
+    if (this.inventoryOpen) {
+      const loot = this.playerStats.loot;
+
+      this.inventoryPanel.setVisible(true);
+      this.inventoryPanel.setText(
+        [
+          "INVENTORY",
+          `Potions: ${this.playerStats.potions}`,
+          `Sword Lv: ${this.playerStats.swordLevel}`,
+          `Damage: ${this.playerStats.damage}`,
+          `Kills: ${this.playerStats.kills}`,
+          `Coins: ${loot.goblinCoin}`,
+          `Fur: ${loot.wolfFur}`,
+          `Teeth: ${loot.orcTooth}`,
+          `Bones: ${loot.trollBone}`,
+          `Crystals: ${loot.magicCrystal}`,
+          "I Close inventory",
+        ].join("\n")
+      );
+    } else {
+      this.inventoryPanel.setText("");
+      this.inventoryPanel.setVisible(false);
+    }
+
+    if (this.questOpen) {
+      const questLines = this.quests.map((q) => {
+        const mark = q.done ? "DONE" : `${q.progress}/${q.target}`;
+        return `${mark} ${q.title}`;
+      });
+
+      this.questPanel.setVisible(true);
+      this.questPanel.setText(["QUESTS", ...questLines, "Q Close quests"].join("\n"));
+    } else {
+      this.questPanel.setText("");
+      this.questPanel.setVisible(false);
+    }
+
+    if (this.upgradeOpen) {
+      this.upgradePanel.setVisible(true);
+      this.upgradePanel.setText(
+        [
+          "UPGRADES",
+          "1 Max HP +20: 70 gold",
+          "2 Damage +8: 90 gold",
+          "3 Castle max +100: 120 gold",
+          "4 Ally level +1: 100 gold",
+          "5 Castle archer tower +1: 150 gold",
+          "O Close upgrades",
+        ].join("\n")
+      );
+    } else {
+      this.upgradePanel.setText("");
+      this.upgradePanel.setVisible(false);
+    }
+  }
+
+  updatePausePanel() {
+    if (!this.isPaused) {
+      this.pausePanel.setText("");
+      this.upgradePanel.setVisible(false);
+    this.pausePanel.setVisible(false);
+      return;
+    }
+
+    this.pausePanel.setVisible(true);
+    this.pausePanel.setText(
+      [
+        "PAUSED",
+        "ESC Resume",
+        "P Save",
+        "4 Sell loot",
+        "L Load",
+      ].join("\n")
+    );
+  }
+
+  updateMinimap() {
+    const x = 780;
+    const y = 390;
+    const w = 160;
+    const h = 120;
+
+    this.minimap.clear();
+
+    this.minimap.fillStyle(0x020617, 0.82);
+    this.minimap.fillRoundedRect(x, y, w, h, 8);
+    this.minimap.lineStyle(2, 0x94a3b8, 1);
+    this.minimap.strokeRoundedRect(x, y, w, h, 8);
+
+    const sx = w / this.worldW;
+    const sy = h / this.worldH;
+
+    const drawPoint = (worldX, worldY, color, size = 3) => {
+      this.minimap.fillStyle(color, 1);
+      this.minimap.fillCircle(x + worldX * sx, y + worldY * sy, size);
+    };
+
+    drawPoint(this.castle.x, this.castle.y, 0x94a3b8, 5);
+    drawPoint(this.player.x, this.player.y, 0x38bdf8, 4);
+
+    this.npcs.forEach((npc) => drawPoint(npc.x, npc.y, 0xfacc15, 3));
+
+    this.enemies.children.iterate((enemy) => {
+      if (enemy && enemy.active) drawPoint(enemy.x, enemy.y, enemy.isBoss ? 0xfacc15 : 0xef4444, enemy.isBoss ? 5 : 3);
+    });
+
+    this.lootDrops.children.iterate((loot) => {
+      if (loot && loot.active) drawPoint(loot.x, loot.y, 0xa78bfa, 2);
+    });
+  }
+
+  showMessage(message) {
+    if (!this.messageText) return;
+    this.messageText.setText(message);
+  }
+
+  showDamage(x, y, damage, color) {
+    this.showFloatingText(x, y - 20, `-${damage}`, color);
+  }
+
+  showFloatingText(x, y, message, color) {
+    const text = this.add.text(x, y, message, {
+      fontSize: "18px",
+      color,
+      fontStyle: "bold",
+      fontFamily: "monospace",
+      stroke: "#000000",
+      strokeThickness: 3,
+    });
+
+    this.tweens.add({
+      targets: text,
+      y: y - 45,
+      alpha: 0,
+      duration: 650,
+      onComplete: () => text.destroy(),
+    });
+  }
 
   gameOver() {
     if (this.gameEnded) return;
@@ -2045,11 +2970,11 @@ export default class WorldScene extends Phaser.Scene {
     overlay.setScrollFactor(0);
     overlay.setDepth(10000);
 
-    const bg = this.add.rectangle(480, 270, 660, 270, 0x111827, 0.96);
+    const bg = this.add.rectangle(480, 270, 640, 250, 0x111827, 0.96);
     bg.setScrollFactor(0);
     bg.setDepth(10001);
 
-    const text = this.add.text(480, 270, "GAME OVER\nCastle Destroyed\nPress ENTER to restart", {
+    const text = this.add.text(480, 270, "GAME OVER\nCastle Destroyed\nRefresh browser to restart", {
       fontSize: "32px",
       color: "#ef4444",
       align: "center",
@@ -2060,12 +2985,5 @@ export default class WorldScene extends Phaser.Scene {
     text.setOrigin(0.5);
     text.setScrollFactor(0);
     text.setDepth(10002);
-
-    this.input.keyboard.once("keydown-ENTER", () => {
-      window.location.reload();
-    });
-  }
-}
-
   }
 }
