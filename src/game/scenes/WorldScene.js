@@ -8,14 +8,16 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   create() {
-    this.worldW = 1800;
-    this.worldH = 1100;
+    this.worldW = 2400;
+    this.worldH = 1500;
 
     this.enemyLanes = [
-      { name: "north road", x: 1180, y: 235 },
-      { name: "main road", x: 1040, y: 535 },
-      { name: "south road", x: 980, y: 790 },
-      { name: "forest path", x: 1340, y: 420 },
+      { name: "north road", x: 1480, y: 250 },
+      { name: "main road", x: 1320, y: 560 },
+      { name: "south road", x: 1240, y: 940 },
+      { name: "forest path", x: 1680, y: 430 },
+      { name: "mountain pass", x: 1980, y: 250 },
+      { name: "swamp trail", x: 1900, y: 1180 },
     ];
 
     this.castleAttackPoints = [
@@ -117,6 +119,7 @@ export default class WorldScene extends Phaser.Scene {
     this.createWorld();
     this.createBattlefieldPolish();
     this.drawEnemyLaneMarkers();
+    this.createBeautifulMapExpansion();
     this.createCastle();
     this.createCastleDamageVisuals();
     this.createPlayer();
@@ -261,6 +264,322 @@ export default class WorldScene extends Phaser.Scene {
         stroke: "#000000",
         strokeThickness: 2,
       }).setAlpha(0.5);
+    });
+  }
+
+  createBeautifulMapExpansion() {
+    // V0.20 map polish: bigger world with readable fantasy regions.
+    // Pure visual upgrade. Does not change combat, save, shop, or quests.
+
+    this.createMountainRegion();
+    this.createSwampRegion();
+    this.createLakeAndBridge();
+    this.createRuinsArea();
+    this.createFarmAndVillageHouses();
+    this.createLongRoadNetwork();
+    this.createExtraForestDepth();
+    this.createAmbientDetails();
+  }
+
+  createMountainRegion() {
+    // Northern mountain pass.
+    for (let i = 0; i < 18; i++) {
+      const x = Phaser.Math.Between(1500, 2320);
+      const y = Phaser.Math.Between(40, 240);
+      const w = Phaser.Math.Between(90, 180);
+      const h = Phaser.Math.Between(90, 170);
+
+      this.add.triangle(
+        x,
+        y,
+        x - w / 2,
+        y + h,
+        x + w / 2,
+        y + h,
+        0x475569,
+        0.95
+      );
+
+      this.add.triangle(
+        x,
+        y + 8,
+        x - w / 5,
+        y + h / 3,
+        x + w / 5,
+        y + h / 3,
+        0xe5e7eb,
+        0.85
+      );
+    }
+
+    this.add.text(1760, 70, "Mountain Pass", {
+      fontSize: "26px",
+      color: "#ffffff",
+      fontFamily: "monospace",
+      stroke: "#000000",
+      strokeThickness: 4,
+    });
+  }
+
+  createSwampRegion() {
+    // South-east swamp.
+    this.add.rectangle(1900, 1180, 760, 420, 0x064e3b, 0.72);
+    this.add.text(1710, 1010, "Old Swamp", {
+      fontSize: "26px",
+      color: "#d1fae5",
+      fontFamily: "monospace",
+      stroke: "#000000",
+      strokeThickness: 4,
+    });
+
+    for (let i = 0; i < 42; i++) {
+      const x = Phaser.Math.Between(1550, 2320);
+      const y = Phaser.Math.Between(1020, 1430);
+
+      this.add.ellipse(
+        x,
+        y,
+        Phaser.Math.Between(44, 105),
+        Phaser.Math.Between(16, 38),
+        Phaser.Math.RND.pick([0x0f766e, 0x115e59, 0x134e4a]),
+        0.45
+      );
+
+      if (i % 3 === 0) {
+        this.add.circle(x + Phaser.Math.Between(-25, 25), y - 6, 4, 0xa7f3d0, 0.65);
+      }
+    }
+  }
+
+  createLakeAndBridge() {
+    // Larger lake connected to the older river.
+    this.add.ellipse(1180, 260, 520, 240, 0x1d4ed8, 0.58);
+    this.add.ellipse(1180, 238, 420, 70, 0x93c5fd, 0.25);
+
+    for (let i = 0; i < 20; i++) {
+      this.add.ellipse(
+        Phaser.Math.Between(950, 1410),
+        Phaser.Math.Between(190, 330),
+        Phaser.Math.Between(40, 100),
+        Phaser.Math.Between(5, 12),
+        0xbfdbfe,
+        0.28
+      );
+    }
+
+    // Wooden bridge.
+    this.add.rectangle(1180, 382, 270, 42, 0x78350f, 0.92);
+    for (let i = 0; i < 9; i++) {
+      this.add.rectangle(1065 + i * 28, 382, 8, 48, 0x451a03, 0.9);
+    }
+
+    this.add.text(1080, 125, "Silver Lake", {
+      fontSize: "24px",
+      color: "#dbeafe",
+      fontFamily: "monospace",
+      stroke: "#000000",
+      strokeThickness: 4,
+    });
+  }
+
+  createRuinsArea() {
+    // Ancient ruins near the east forest.
+    this.add.text(1840, 620, "Ancient Ruins", {
+      fontSize: "25px",
+      color: "#e5e7eb",
+      fontFamily: "monospace",
+      stroke: "#000000",
+      strokeThickness: 4,
+    });
+
+    for (let i = 0; i < 12; i++) {
+      this.drawBrokenPillar(
+        Phaser.Math.Between(1750, 2260),
+        Phaser.Math.Between(680, 890)
+      );
+    }
+
+    for (let i = 0; i < 22; i++) {
+      this.drawRuinsStone(
+        Phaser.Math.Between(1710, 2290),
+        Phaser.Math.Between(650, 930)
+      );
+    }
+  }
+
+  drawBrokenPillar(x, y) {
+    const h = Phaser.Math.Between(42, 95);
+    this.add.rectangle(x, y, 26, h, 0x94a3b8, 0.95);
+    this.add.rectangle(x, y - h / 2 - 8, 36, 12, 0xcbd5e1, 0.85);
+    this.add.rectangle(x + 3, y, 5, h - 8, 0x64748b, 0.55);
+    this.add.ellipse(x, y + h / 2 + 6, 44, 12, 0x000000, 0.18);
+  }
+
+  drawRuinsStone(x, y) {
+    this.add.ellipse(x, y + 7, 36, 10, 0x000000, 0.15);
+    this.add.rectangle(x, y, Phaser.Math.Between(18, 44), Phaser.Math.Between(10, 22), 0x94a3b8, 0.9);
+  }
+
+  createFarmAndVillageHouses() {
+    // Farm fields below market.
+    for (let i = 0; i < 6; i++) {
+      const x = 310 + i * 105;
+      this.add.rectangle(x, 1160, 85, 160, 0x854d0e, 0.7);
+
+      for (let row = 0; row < 7; row++) {
+        this.add.rectangle(x, 1090 + row * 22, 78, 3, 0xfacc15, 0.35);
+      }
+    }
+
+    this.add.text(300, 1040, "Farmlands", {
+      fontSize: "25px",
+      color: "#ffffff",
+      fontFamily: "monospace",
+      stroke: "#000000",
+      strokeThickness: 4,
+    });
+
+    this.drawHouse(700, 1080, 0x1d4ed8);
+    this.drawHouse(820, 1145, 0xb91c1c);
+    this.drawHouse(610, 1250, 0x15803d);
+    this.drawHouse(910, 1280, 0x7c3aed);
+  }
+
+  drawHouse(x, y, roofColor) {
+    this.add.ellipse(x, y + 48, 100, 24, 0x000000, 0.18);
+    this.add.rectangle(x, y + 25, 78, 62, 0xfacc15, 0.8);
+    this.add.triangle(x, y - 38, x - 55, y + 5, x + 55, y + 5, roofColor, 0.95);
+    this.add.rectangle(x - 18, y + 38, 16, 36, 0x78350f);
+    this.add.rectangle(x + 22, y + 25, 18, 18, 0x93c5fd, 0.9);
+  }
+
+  createLongRoadNetwork() {
+    const road = this.add.graphics();
+    road.fillStyle(0x7c4a18, 0.46);
+
+    // Main road from castle to east map.
+    road.fillRoundedRect(780, 510, 960, 74, 22);
+
+    // Road to mountains.
+    road.fillRoundedRect(1500, 245, 360, 60, 22);
+
+    // Road to swamp.
+    road.fillRoundedRect(1340, 850, 580, 65, 22);
+
+    // Road to farms.
+    road.fillRoundedRect(500, 880, 86, 380, 22);
+
+    // Stone highlights.
+    for (let i = 0; i < 75; i++) {
+      this.add.ellipse(
+        Phaser.Math.Between(760, 1760),
+        Phaser.Math.Between(520, 575),
+        Phaser.Math.Between(8, 20),
+        Phaser.Math.Between(4, 9),
+        0xa16207,
+        0.28
+      );
+    }
+  }
+
+  createExtraForestDepth() {
+    for (let i = 0; i < 95; i++) {
+      this.drawPineTree(
+        Phaser.Math.Between(1280, 2350),
+        Phaser.Math.Between(300, 1020)
+      );
+    }
+
+    for (let i = 0; i < 40; i++) {
+      this.drawBush(
+        Phaser.Math.Between(1120, 2300),
+        Phaser.Math.Between(300, 1400)
+      );
+    }
+  }
+
+  drawPineTree(x, y) {
+    this.add.ellipse(x, y + 32, 34, 12, 0x000000, 0.18);
+    this.add.rectangle(x, y + 20, 9, 42, 0x78350f);
+    this.add.triangle(x, y - 30, x - 32, y + 30, x + 32, y + 30, 0x065f46, 0.95);
+    this.add.triangle(x, y - 55, x - 25, y, x + 25, y, 0x047857, 0.95);
+    this.add.triangle(x, y - 76, x - 18, y - 28, x + 18, y - 28, 0x064e3b, 0.95);
+  }
+
+  drawBush(x, y) {
+    this.add.ellipse(x, y + 10, 42, 12, 0x000000, 0.12);
+    this.add.circle(x - 16, y, 16, 0x15803d, 0.85);
+    this.add.circle(x, y - 6, 20, 0x16a34a, 0.85);
+    this.add.circle(x + 18, y, 15, 0x166534, 0.85);
+  }
+
+  createAmbientDetails() {
+    // Flowers, mushrooms, torches, fireflies.
+    for (let i = 0; i < 240; i++) {
+      const x = Phaser.Math.Between(70, this.worldW - 70);
+      const y = Phaser.Math.Between(90, this.worldH - 70);
+
+      this.add.circle(
+        x,
+        y,
+        Phaser.Math.Between(2, 4),
+        Phaser.Math.RND.pick([0xfacc15, 0xf472b6, 0xffffff, 0xa7f3d0, 0x93c5fd]),
+        0.72
+      );
+    }
+
+    for (let i = 0; i < 28; i++) {
+      this.drawMushroom(
+        Phaser.Math.Between(1250, 2300),
+        Phaser.Math.Between(430, 1350)
+      );
+    }
+
+    this.drawTorch(260, 515);
+    this.drawTorch(260, 585);
+    this.drawTorch(460, 830);
+    this.drawTorch(700, 830);
+    this.drawTorch(1165, 410);
+    this.drawTorch(1195, 410);
+
+    for (let i = 0; i < 30; i++) {
+      const glow = this.add.circle(
+        Phaser.Math.Between(1120, 2320),
+        Phaser.Math.Between(340, 1250),
+        3,
+        0xfacc15,
+        0.45
+      );
+
+      this.tweens.add({
+        targets: glow,
+        alpha: 0.08,
+        yoyo: true,
+        repeat: -1,
+        duration: Phaser.Math.Between(800, 1800),
+      });
+    }
+  }
+
+  drawMushroom(x, y) {
+    this.add.rectangle(x, y + 7, 5, 12, 0xf8fafc, 0.9);
+    this.add.ellipse(x, y, 18, 12, 0xef4444, 0.85);
+    this.add.circle(x - 4, y - 2, 2, 0xffffff, 0.85);
+    this.add.circle(x + 4, y, 2, 0xffffff, 0.85);
+  }
+
+  drawTorch(x, y) {
+    this.add.rectangle(x, y + 15, 6, 34, 0x78350f);
+    const flame = this.add.circle(x, y - 5, 12, 0xf97316, 0.85);
+    const core = this.add.circle(x, y - 8, 7, 0xfacc15, 0.95);
+
+    this.tweens.add({
+      targets: [flame, core],
+      scale: 1.18,
+      alpha: 0.75,
+      yoyo: true,
+      repeat: -1,
+      duration: 320,
     });
   }
 
@@ -938,35 +1257,35 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   getSpawnPoint() {
-    const lane = Phaser.Math.RND.pick(this.enemyLanes);
+    const lane = Phaser.Math.RND.pick(this.enemyLanes ?? []);
 
-    if (lane.name === "north road") {
+    if (lane.name === "north road" || lane.name === "mountain pass") {
       return {
-        x: Phaser.Math.Between(1320, 1740),
-        y: Phaser.Math.Between(120, 220),
+        x: Phaser.Math.Between(1850, 2350),
+        y: Phaser.Math.Between(90, 260),
         lane,
       };
     }
 
     if (lane.name === "main road") {
       return {
-        x: Phaser.Math.Between(1420, 1760),
-        y: Phaser.Math.Between(480, 580),
+        x: Phaser.Math.Between(1900, 2350),
+        y: Phaser.Math.Between(480, 610),
         lane,
       };
     }
 
-    if (lane.name === "south road") {
+    if (lane.name === "south road" || lane.name === "swamp trail") {
       return {
-        x: Phaser.Math.Between(1250, 1680),
-        y: Phaser.Math.Between(760, 980),
+        x: Phaser.Math.Between(1700, 2350),
+        y: Phaser.Math.Between(920, 1370),
         lane,
       };
     }
 
     return {
-      x: Phaser.Math.Between(1450, 1760),
-      y: Phaser.Math.Between(330, 500),
+      x: Phaser.Math.Between(1950, 2350),
+      y: Phaser.Math.Between(320, 560),
       lane,
     };
   }
