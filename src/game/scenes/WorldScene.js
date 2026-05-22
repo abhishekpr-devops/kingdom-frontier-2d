@@ -1181,6 +1181,7 @@ export default class WorldScene extends Phaser.Scene {
     this.movePlayer();
     this.updateEnemies(time);
     this.updateAllies(time);
+    this.resolveUnitOverlap();
     this.updateLabels();
     this.updateUI();
     this.updateMinimap();
@@ -2734,6 +2735,120 @@ export default class WorldScene extends Phaser.Scene {
     if (enemy.nameLabel) {
       enemy.nameLabel.x = enemy.x - 45;
       enemy.nameLabel.y = enemy.y - 75;
+    }
+  }
+
+
+  resolveUnitOverlap() {
+    const units = [];
+
+    if (this.player && this.player.active !== false) {
+      units.push({
+        ref: this.player,
+        radius: 22,
+        fixed: false,
+        weight: 1.4,
+      });
+    }
+
+    if (this.allies) {
+      this.allies.children.iterate((ally) => {
+        if (!ally || !ally.active) return;
+
+        units.push({
+          ref: ally,
+          radius: ally.role === "castleArcher" ? 28 : 23,
+          fixed: ally.role === "castleArcher",
+          weight: ally.role === "castleArcher" ? 10 : 1,
+        });
+      });
+    }
+
+    if (this.enemies) {
+      this.enemies.children.iterate((enemy) => {
+        if (!enemy || !enemy.active) return;
+
+        units.push({
+          ref: enemy,
+          radius: enemy.isBoss ? 42 : enemy.enemyType === "Armored Orc" ? 30 : 23,
+          fixed: false,
+          weight: enemy.isBoss ? 2.4 : 1,
+        });
+      });
+    }
+
+    // Gentle local avoidance.
+    // Important: do NOT use body.reset() here.
+    // body.reset() kills velocity and causes units to stick together.
+    for (let pass = 0; pass < 2; pass++) {
+      for (let i = 0; i < units.length; i++) {
+        for (let j = i + 1; j < units.length; j++) {
+          const a = units[i];
+          const b = units[j];
+
+          let dx = b.ref.x - a.ref.x;
+          let dy = b.ref.y - a.ref.y;
+
+          let distSq = dx * dx + dy * dy;
+
+          if (distSq === 0) {
+            dx = Phaser.Math.FloatBetween(-0.5, 0.5);
+            dy = Phaser.Math.FloatBetween(-0.5, 0.5);
+            distSq = dx * dx + dy * dy;
+          }
+
+          const dist = Math.sqrt(distSq);
+          const minDist = a.radius + b.radius;
+
+          if (dist >= minDist) continue;
+
+          const nx = dx / dist;
+          const ny = dy / dist;
+
+          // Move only part of the overlap each frame.
+          // This avoids sudden snapping and sticky movement.
+          const overlap = (minDist - dist) * 0.35;
+
+          if (a.fixed && b.fixed) {
+            continue;
+          }
+
+          if (a.fixed && !b.fixed) {
+            b.ref.x += nx * overlap;
+            b.ref.y += ny * overlap;
+          } else if (!a.fixed && b.fixed) {
+            a.ref.x -= nx * overlap;
+            a.ref.y -= ny * overlap;
+          } else {
+            const totalWeight = a.weight + b.weight;
+            const aMove = (b.weight / totalWeight) * overlap;
+            const bMove = (a.weight / totalWeight) * overlap;
+
+            a.ref.x -= nx * aMove;
+            a.ref.y -= ny * aMove;
+
+            b.ref.x += nx * bMove;
+            b.ref.y += ny * bMove;
+          }
+
+          a.ref.x = Phaser.Math.Clamp(a.ref.x, 25, this.worldW - 25);
+          a.ref.y = Phaser.Math.Clamp(a.ref.y, 25, this.worldH - 25);
+
+          b.ref.x = Phaser.Math.Clamp(b.ref.x, 25, this.worldW - 25);
+          b.ref.y = Phaser.Math.Clamp(b.ref.y, 25, this.worldH - 25);
+
+          // Sync body position without killing velocity.
+          if (a.ref.body) {
+            a.ref.body.x = a.ref.x - a.ref.body.width / 2;
+            a.ref.body.y = a.ref.y - a.ref.body.height / 2;
+          }
+
+          if (b.ref.body) {
+            b.ref.body.x = b.ref.x - b.ref.body.width / 2;
+            b.ref.body.y = b.ref.y - b.ref.body.height / 2;
+          }
+        }
+      }
     }
   }
 
