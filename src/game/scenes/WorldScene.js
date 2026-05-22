@@ -21,6 +21,7 @@ export default class WorldScene extends Phaser.Scene {
     this.shopOpen = false;
     this.inventoryOpen = false;
     this.questOpen = false;
+    this.upgradeOpen = false;
     this.isPaused = false;
     this.gameEnded = false;
     this.lastSavedText = "Never";
@@ -98,6 +99,7 @@ export default class WorldScene extends Phaser.Scene {
     this.createWorld();
     this.createBattlefieldPolish();
     this.createCastle();
+    this.createCastleDamageVisuals();
     this.createPlayer();
     this.createNPCs();
     this.createAllies();
@@ -345,60 +347,124 @@ export default class WorldScene extends Phaser.Scene {
   createAllies() {
     this.allies = this.physics.add.group();
 
-    this.spawnAlly("Knight", 250, 565);
-    this.spawnAlly("Knight", 310, 500);
-    this.spawnAlly("Archer", 175, 345);
-    this.spawnAlly("Archer", 75, 360);
+    this.spawnAlly("Player Knight", 250, 565);
+    this.spawnAlly("Ally Knight", 315, 510);
+    this.spawnAlly("Ally Archer", 170, 355);
+    this.spawnAlly("Castle Archer", 85, 350);
+    this.spawnAlly("Healer", 365, 600);
   }
 
+
   spawnAlly(type, x, y) {
-    const color = type === "Archer" ? 0xfacc15 : 0x2563eb;
+    const config = {
+      "Player Knight": {
+        color: 0x2563eb,
+        hp: 165,
+        damage: 15,
+        range: 95,
+        speed: 78,
+        role: "knight",
+      },
+      "Ally Knight": {
+        color: 0x3b82f6,
+        hp: 140,
+        damage: 13,
+        range: 92,
+        speed: 72,
+        role: "knight",
+      },
+      "Ally Archer": {
+        color: 0xfacc15,
+        hp: 90,
+        damage: 9,
+        range: 330,
+        speed: 46,
+        role: "archer",
+      },
+      "Castle Archer": {
+        color: 0xf59e0b,
+        hp: 110,
+        damage: 12,
+        range: 420,
+        speed: 0,
+        role: "castleArcher",
+      },
+      "Healer": {
+        color: 0x22c55e,
+        hp: 95,
+        damage: 0,
+        range: 230,
+        speed: 42,
+        role: "healer",
+      },
+    }[type];
 
     const ally = this.add.container(x, y);
 
-    ally.shadow = this.add.ellipse(0, 22, 34, 11, 0x000000, 0.25);
-    ally.outline = this.add.rectangle(0, 0, 34, 42, 0x0f172a);
-    ally.bodyShape = this.add.rectangle(0, 0, 28, 36, color);
-    ally.headOutline = this.add.circle(0, -22, 15, 0x0f172a);
-    ally.head = this.add.circle(0, -22, 12, 0xfde68a);
+    ally.shadow = this.add.ellipse(0, 23, 36, 12, 0x000000, 0.28);
+    ally.outline = this.add.rectangle(0, 0, 36, 44, 0x0f172a);
+    ally.bodyShape = this.add.rectangle(0, 0, 30, 38, config.color);
+    ally.headOutline = this.add.circle(0, -24, 16, 0x0f172a);
+    ally.head = this.add.circle(0, -24, 13, 0xfde68a);
 
-    if (type === "Archer") {
-      ally.weapon = this.add.arc(18, 0, 18, 250, 110, false, 0x7c2d12);
+    if (config.role === "archer" || config.role === "castleArcher") {
+      ally.weapon = this.add.arc(20, 0, 18, 250, 110, false, 0x7c2d12);
+    } else if (config.role === "healer") {
+      ally.weapon = this.add.circle(20, 0, 8, 0xa7f3d0);
     } else {
-      ally.weapon = this.add.rectangle(20, 0, 8, 30, 0xcbd5e1);
+      ally.weapon = this.add.rectangle(21, 0, 8, 32, 0xcbd5e1);
     }
 
-    ally.add([ally.shadow, ally.outline, ally.bodyShape, ally.headOutline, ally.head, ally.weapon]);
+    ally.add([
+      ally.shadow,
+      ally.outline,
+      ally.bodyShape,
+      ally.headOutline,
+      ally.head,
+      ally.weapon,
+    ]);
 
     this.physics.add.existing(ally);
-    ally.body.setSize(28, 36);
-    ally.body.setOffset(-14, -18);
+    ally.body.setSize(30, 38);
+    ally.body.setOffset(-15, -19);
     ally.body.setCollideWorldBounds(true);
 
     ally.type = type;
-    ally.damage = type === "Archer" ? 7 : 10;
-    ally.range = type === "Archer" ? 320 : 95;
-    ally.speed = type === "Archer" ? 45 : 75;
+    ally.role = config.role;
+    ally.damage = config.damage;
+    ally.range = config.range;
+    ally.speed = config.speed;
+    ally.maxHp = config.hp;
+    ally.hp = ally.maxHp;
+
     ally.lastAttack = 0;
+    ally.lastHeal = 0;
     ally.currentTarget = null;
     ally.nextTargetCheck = 0;
     ally.nextMoveDecision = 0;
-    ally.holdX = x;
-    ally.holdY = y;
     ally.homeX = x;
     ally.homeY = y;
     ally.wanderX = x;
     ally.wanderY = y;
     ally.nextWander = 0;
 
-    this.add.text(x - 28, y - 58, type, {
-      fontSize: "12px",
+    const label = this.add.text(x - 42, y - 64, type, {
+      fontSize: "11px",
       color: "#ffffff",
       fontFamily: "monospace",
+      stroke: "#000000",
+      strokeThickness: 3,
     });
+
+    ally.nameLabel = label;
+
+    // Health bar: red base, green current HP.
+    ally.hpBack = this.add.rectangle(x, y - 46, 44, 7, 0x7f1d1d);
+    ally.hpBar = this.add.rectangle(x, y - 46, 42, 5, 0x22c55e);
 
     this.allies.add(ally);
   }
+
 
   createGroups() {
     this.enemies = this.physics.add.group();
@@ -430,6 +496,8 @@ export default class WorldScene extends Phaser.Scene {
       ONE: Phaser.Input.Keyboard.KeyCodes.ONE,
       TWO: Phaser.Input.Keyboard.KeyCodes.TWO,
       THREE: Phaser.Input.Keyboard.KeyCodes.THREE,
+      FOUR: Phaser.Input.Keyboard.KeyCodes.FOUR,
+      O: Phaser.Input.Keyboard.KeyCodes.O,
     });
   }
 
@@ -462,6 +530,13 @@ export default class WorldScene extends Phaser.Scene {
       if (this.playerStats.hp <= 0) {
         this.respawnPlayer();
       }
+    });
+
+    this.physics.add.overlap(this.enemyProjectiles, this.allies, (ally, projectile) => {
+      if (!projectile.active || !ally.active) return;
+
+      this.damageAlly(ally, projectile.damage);
+      projectile.destroy();
     });
 
     this.physics.add.overlap(this.player, this.enemies, (player, enemy) => {
@@ -544,6 +619,15 @@ export default class WorldScene extends Phaser.Scene {
       lineSpacing: 5,
     });
 
+    this.upgradePanel = this.add.text(600, 110, "", {
+      fontSize: "13px",
+      color: "#ffffff",
+      fontFamily: "monospace",
+      backgroundColor: "#111827",
+      padding: { x: 12, y: 10 },
+      lineSpacing: 5,
+    });
+
     this.pausePanel = this.add.text(330, 170, "", {
       fontSize: "24px",
       color: "#ffffff",
@@ -565,6 +649,7 @@ export default class WorldScene extends Phaser.Scene {
       this.shopPanel,
       this.inventoryPanel,
       this.questPanel,
+      this.upgradePanel,
       this.pausePanel,
       this.minimap,
     ]) {
@@ -575,6 +660,7 @@ export default class WorldScene extends Phaser.Scene {
     this.shopPanel.setVisible(false);
     this.inventoryPanel.setVisible(false);
     this.questPanel.setVisible(false);
+    this.upgradePanel.setVisible(false);
     this.pausePanel.setVisible(false);
 
     this.updateHelpPanel();
@@ -583,27 +669,51 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   spawnWave() {
+    if (this.waveCooldown) return;
+
     this.waveCooldown = true;
 
-    this.time.delayedCall(900, () => {
-      const isBossWave = this.wave % 5 === 0;
-      const count = isBossWave ? 8 + this.wave : 5 + this.wave * 2;
+    let countDown = 3;
+    this.showMessage(`Next wave in ${countDown}...`);
 
-      for (let i = 0; i < count; i++) {
-        const { x, y } = this.getSpawnPoint();
-        this.spawnEnemy(x, y, false);
-      }
+    const countdownEvent = this.time.addEvent({
+      delay: 1000,
+      repeat: 2,
+      callback: () => {
+        countDown -= 1;
 
-      if (isBossWave) {
-        const bossSpawn = this.getSpawnPoint();
-        this.spawnEnemy(bossSpawn.x, bossSpawn.y, true);
-        this.showMessage(`Boss wave ${this.wave}. Boss Orc has appeared.`);
-      } else {
-        this.showMessage(`Wave ${this.wave} started.`);
-      }
+        if (countDown > 0) {
+          this.showMessage(`Next wave in ${countDown}...`);
+          this.playSound("tick");
+          return;
+        }
 
-      this.waveCooldown = false;
+        countdownEvent.remove(false);
+        this.startWaveNow();
+      },
     });
+  }
+
+  startWaveNow() {
+    const isBossWave = this.wave % 5 === 0;
+    const count = isBossWave ? 8 + this.wave : 5 + this.wave * 2;
+
+    for (let i = 0; i < count; i++) {
+      const { x, y } = this.getSpawnPoint();
+      this.spawnEnemy(x, y, false);
+    }
+
+    if (isBossWave) {
+      const bossSpawn = this.getSpawnPoint();
+      this.spawnEnemy(bossSpawn.x, bossSpawn.y, true);
+      this.showMessage(`Boss wave ${this.wave}. Boss Orc has appeared.`);
+      this.playSound("boss");
+    } else {
+      this.showMessage(`Wave ${this.wave} started.`);
+      this.playSound("wave");
+    }
+
+    this.waveCooldown = false;
   }
 
   getSpawnPoint() {
@@ -631,21 +741,42 @@ export default class WorldScene extends Phaser.Scene {
 
   spawnEnemy(x, y, isBoss = false) {
     const availableTypes = this.wave >= 4
-      ? ["Goblin", "Orc", "Wolf", "Troll", "Skeleton Archer", "Dark Mage"]
-      : ["Goblin", "Orc", "Wolf"];
+      ? ["Goblin", "Orc Warrior", "Orc Archer", "Armored Orc"]
+      : ["Goblin", "Orc Warrior", "Orc Archer"];
 
-    const enemyType = isBoss ? "Boss Orc" : Phaser.Math.RND.pick(availableTypes);
+    const enemyType = isBoss ? "Troll Boss" : Phaser.Math.RND.pick(availableTypes);
 
     const enemy = this.add.container(x, y);
-    enemy.shadow = this.add.ellipse(0, 23, 30, 10, 0x000000, 0.24);
+    enemy.shadow = this.add.ellipse(0, 24, 34, 12, 0x000000, 0.3);
 
     const stats = this.getEnemyStats(enemyType);
 
-    enemy.outline = this.add.rectangle(0, 0, stats.sizeW + 6, stats.sizeH + 6, 0x0f172a);
+    enemy.outline = this.add.rectangle(0, 0, stats.sizeW + 7, stats.sizeH + 7, 0x0f172a);
     enemy.bodyShape = this.add.rectangle(0, 0, stats.sizeW, stats.sizeH, stats.color);
-    enemy.headOutline = this.add.circle(0, -stats.sizeH / 2 - 6, stats.headSize + 3, 0x0f172a);
-    enemy.head = this.add.circle(0, -stats.sizeH / 2 - 6, stats.headSize, stats.headColor);
-    enemy.add([enemy.shadow, enemy.outline, enemy.bodyShape, enemy.headOutline, enemy.head]);
+    enemy.headOutline = this.add.circle(0, -stats.sizeH / 2 - 7, stats.headSize + 3, 0x0f172a);
+    enemy.head = this.add.circle(0, -stats.sizeH / 2 - 7, stats.headSize, stats.headColor);
+
+    if (stats.isRanged) {
+      enemy.weapon = this.add.arc(20, 0, 18, 250, 110, false, 0x7c2d12);
+    } else if (enemyType === "Armored Orc") {
+      enemy.weapon = this.add.rectangle(22, 2, 10, 36, 0xe5e7eb);
+      enemy.shield = this.add.rectangle(-18, 2, 10, 28, 0x64748b);
+    } else if (enemyType === "Troll Boss") {
+      enemy.weapon = this.add.rectangle(34, 2, 14, 54, 0x78350f);
+    } else {
+      enemy.weapon = this.add.rectangle(21, 1, 8, 30, 0x9ca3af);
+    }
+
+    enemy.add([
+      enemy.shadow,
+      enemy.outline,
+      enemy.bodyShape,
+      enemy.headOutline,
+      enemy.head,
+    ]);
+
+    if (enemy.shield) enemy.add(enemy.shield);
+    if (enemy.weapon) enemy.add(enemy.weapon);
 
     this.physics.add.existing(enemy);
     enemy.body.setSize(stats.sizeW, stats.sizeH);
@@ -659,7 +790,10 @@ export default class WorldScene extends Phaser.Scene {
     enemy.gold = stats.gold;
     enemy.isRanged = stats.isRanged;
     enemy.isBoss = isBoss;
+
     enemy.lastAttack = 0;
+    enemy.nextBossStomp = 0;
+    enemy.nextBossSummon = 0;
     enemy.currentTargetKind = "castle";
     enemy.currentTargetRef = null;
     enemy.nextTargetCheck = 0;
@@ -668,102 +802,89 @@ export default class WorldScene extends Phaser.Scene {
     enemy.wanderX = 0;
     enemy.wanderY = 0;
 
-    enemy.hpBack = this.add.rectangle(enemy.x, enemy.y - 48, 46, 6, 0x111827);
-    enemy.hpBar = this.add.rectangle(enemy.x, enemy.y - 48, 44, 4, isBoss ? 0xfacc15 : 0x22c55e);
+    enemy.nameLabel = this.add.text(enemy.x - 42, enemy.y - 66, enemyType, {
+      fontSize: enemy.isBoss ? "13px" : "10px",
+      color: enemy.isBoss ? "#facc15" : "#ffffff",
+      fontFamily: "monospace",
+      stroke: "#000000",
+      strokeThickness: 3,
+    });
+
+    // Health bar: red base, green current HP.
+    enemy.hpBack = this.add.rectangle(enemy.x, enemy.y - 50, 50, 7, 0x7f1d1d);
+    enemy.hpBar = this.add.rectangle(enemy.x, enemy.y - 50, 48, 5, 0x22c55e);
 
     this.enemies.add(enemy);
   }
+
 
   getEnemyStats(type) {
     const base = {
       Goblin: {
         color: 0x84cc16,
         headColor: 0x365314,
-        hp: 70 + this.wave * 12,
-        speed: 45 + this.wave * 2,
-        damage: 6 + this.wave,
-        gold: 5,
+        hp: 90 + this.wave * 16,
+        speed: 48 + this.wave * 2,
+        damage: 13 + this.wave * 2,
+        gold: 6,
         sizeW: 30,
         sizeH: 34,
         headSize: 12,
         isRanged: false,
       },
-      Orc: {
+      "Orc Warrior": {
         color: 0xef4444,
         headColor: 0x7f1d1d,
-        hp: 110 + this.wave * 18,
-        speed: 26 + this.wave * 2,
-        damage: 10 + this.wave,
-        gold: 8,
-        sizeW: 32,
-        sizeH: 38,
-        headSize: 13,
+        hp: 145 + this.wave * 24,
+        speed: 30 + this.wave * 2,
+        damage: 19 + this.wave * 2,
+        gold: 10,
+        sizeW: 34,
+        sizeH: 40,
+        headSize: 14,
         isRanged: false,
       },
-      Wolf: {
-        color: 0x64748b,
-        headColor: 0x334155,
-        hp: 65 + this.wave * 10,
-        speed: 58 + this.wave * 2,
-        damage: 7 + this.wave,
-        gold: 6,
-        sizeW: 38,
-        sizeH: 24,
-        headSize: 10,
-        isRanged: false,
-      },
-      Troll: {
-        color: 0x166534,
-        headColor: 0x052e16,
-        hp: 220 + this.wave * 28,
-        speed: 18 + this.wave,
-        damage: 18 + this.wave,
-        gold: 16,
-        sizeW: 44,
-        sizeH: 54,
-        headSize: 17,
-        isRanged: false,
-      },
-      "Skeleton Archer": {
-        color: 0xe5e7eb,
-        headColor: 0xf8fafc,
-        hp: 80 + this.wave * 12,
-        speed: 28 + this.wave,
-        damage: 10 + this.wave,
-        gold: 12,
-        sizeW: 28,
-        sizeH: 36,
-        headSize: 12,
-        isRanged: true,
-      },
-      "Dark Mage": {
-        color: 0x7c3aed,
-        headColor: 0x312e81,
-        hp: 95 + this.wave * 14,
-        speed: 24 + this.wave,
-        damage: 14 + this.wave,
-        gold: 18,
+      "Orc Archer": {
+        color: 0xf97316,
+        headColor: 0x7c2d12,
+        hp: 105 + this.wave * 18,
+        speed: 32 + this.wave,
+        damage: 16 + this.wave * 2,
+        gold: 13,
         sizeW: 30,
         sizeH: 38,
         headSize: 13,
         isRanged: true,
       },
-      "Boss Orc": {
-        color: 0xb91c1c,
-        headColor: 0x450a0a,
-        hp: 650 + this.wave * 80,
+      "Armored Orc": {
+        color: 0x64748b,
+        headColor: 0x1f2937,
+        hp: 230 + this.wave * 34,
+        speed: 22 + this.wave,
+        damage: 24 + this.wave * 2,
+        gold: 20,
+        sizeW: 40,
+        sizeH: 46,
+        headSize: 16,
+        isRanged: false,
+      },
+      "Troll Boss": {
+        color: 0x166534,
+        headColor: 0x052e16,
+        hp: 850 + this.wave * 110,
         speed: 20 + this.wave,
-        damage: 28 + this.wave * 2,
-        gold: 120,
-        sizeW: 64,
-        sizeH: 76,
-        headSize: 24,
+        damage: 36 + this.wave * 3,
+        gold: 160,
+        sizeW: 70,
+        sizeH: 84,
+        headSize: 26,
         isRanged: false,
       },
     };
 
     return base[type];
   }
+
 
   update(time) {
     if (this.gameEnded) {
@@ -820,6 +941,11 @@ export default class WorldScene extends Phaser.Scene {
       this.updatePanels();
     }
 
+    if (Phaser.Input.Keyboard.JustDown(this.keys.O)) {
+      this.upgradeOpen = !this.upgradeOpen;
+      this.updatePanels();
+    }
+
     if (Phaser.Input.Keyboard.JustDown(this.keys.B)) {
       if (!this.shopOpen && !this.isNearShopNPC()) {
         this.showMessage("Stand near Merchant or Blacksmith to open shop.");
@@ -839,6 +965,12 @@ export default class WorldScene extends Phaser.Scene {
     if (this.shopOpen && Phaser.Input.Keyboard.JustDown(this.keys.ONE)) this.buyPotion();
     if (this.shopOpen && Phaser.Input.Keyboard.JustDown(this.keys.TWO)) this.upgradeSword();
     if (this.shopOpen && Phaser.Input.Keyboard.JustDown(this.keys.THREE)) this.repairCastle();
+    if (this.shopOpen && Phaser.Input.Keyboard.JustDown(this.keys.FOUR)) this.sellAllLoot();
+
+    if (this.upgradeOpen && !this.shopOpen && Phaser.Input.Keyboard.JustDown(this.keys.ONE)) this.buyUpgrade("hp");
+    if (this.upgradeOpen && !this.shopOpen && Phaser.Input.Keyboard.JustDown(this.keys.TWO)) this.buyUpgrade("damage");
+    if (this.upgradeOpen && !this.shopOpen && Phaser.Input.Keyboard.JustDown(this.keys.THREE)) this.buyUpgrade("castle");
+    if (this.upgradeOpen && !this.shopOpen && Phaser.Input.Keyboard.JustDown(this.keys.FOUR)) this.buyUpgrade("allies");
   }
 
   togglePause() {
@@ -909,21 +1041,28 @@ export default class WorldScene extends Phaser.Scene {
     const castleDist = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.castleGatePoint.x, this.castleGatePoint.y);
     const nearestAlly = this.getNearestAlly(enemy);
 
-    if (playerDist < 155) {
+    if (nearestAlly && nearestAlly.distance < 150) {
+      enemy.currentTargetKind = "ally";
+      enemy.currentTargetRef = nearestAlly.ally;
+      return;
+    }
+
+    if (playerDist < 165) {
       enemy.currentTargetKind = "player";
       enemy.currentTargetRef = this.player;
       return;
     }
 
-    if (nearestAlly && nearestAlly.distance < 135) {
-      enemy.currentTargetKind = "ally";
-      enemy.currentTargetRef = nearestAlly.ally;
+    if (castleDist < 360) {
+      enemy.currentTargetKind = "castle";
+      enemy.currentTargetRef = null;
       return;
     }
 
     enemy.currentTargetKind = "castle";
     enemy.currentTargetRef = null;
   }
+
 
   resolveEnemyTarget(enemy) {
     if (enemy.currentTargetKind === "player") {
@@ -952,31 +1091,42 @@ export default class WorldScene extends Phaser.Scene {
   updateMeleeEnemy(enemy, targetX, targetY, time, targetKind = "castle", distance = null) {
     const dist = distance ?? Phaser.Math.Distance.Between(enemy.x, enemy.y, targetX, targetY);
 
-    const attackDistance = targetKind === "castle" ? 92 : 54;
+    const attackDistance = targetKind === "castle" ? 96 : 58;
 
-    // Lock enemy in attack range. Do not let it wander away while attacking.
+    if (enemy.isBoss) {
+      this.updateBossSpecials(enemy, time);
+    }
+
+    // Enemy locks in when close enough. No more walking away while attacking.
     if (dist <= attackDistance) {
       enemy.body.setVelocity(0);
 
-      if (targetKind === "castle") {
-        this.castleHealth -= enemy.isBoss ? 0.28 : 0.12;
-        if (this.castleHealth <= 0) this.gameOver();
+      if (targetKind === "castle" && time - enemy.lastAttack > 650) {
+        enemy.lastAttack = time;
+        this.applyCastleDamage(enemy.isBoss ? enemy.damage * 1.1 : enemy.damage * 0.7);
       }
 
-      if (targetKind === "player" && time - enemy.lastAttack > 900) {
+      if (targetKind === "player" && time - enemy.lastAttack > 700) {
         enemy.lastAttack = time;
-        this.damagePlayer(enemy);
+        this.playerStats.hp -= enemy.damage;
+        this.showDamage(this.player.x, this.player.y, enemy.damage, "#ef4444");
+        this.cameras.main.shake(90, 0.006);
+        this.playSound("hurt");
+
+        if (this.playerStats.hp <= 0) {
+          this.respawnPlayer();
+        }
       }
 
-      if (targetKind === "ally" && time - enemy.lastAttack > 950) {
+      if (targetKind === "ally" && enemy.currentTargetRef && enemy.currentTargetRef.active && time - enemy.lastAttack > 780) {
         enemy.lastAttack = time;
-        this.showDamage(targetX, targetY, enemy.damage, "#ef4444");
+        this.damageAlly(enemy.currentTargetRef, enemy.damage);
       }
 
       return;
     }
 
-    // Only choose wander offset while far. This prevents near-target vibration.
+    // Move only while not in attack range.
     if (time > enemy.nextWander) {
       enemy.nextWander = time + Phaser.Math.Between(900, 1600);
       enemy.wanderX = targetKind === "castle" ? Phaser.Math.Between(-25, 25) : 0;
@@ -998,7 +1148,7 @@ export default class WorldScene extends Phaser.Scene {
     const dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, targetX, targetY);
 
     const minRange = 210;
-    const maxRange = 330;
+    const maxRange = 340;
 
     if (dist > maxRange) {
       if (time > enemy.nextMoveDecision) {
@@ -1017,7 +1167,7 @@ export default class WorldScene extends Phaser.Scene {
       enemy.body.setVelocity(0);
     }
 
-    if (dist < 360 && time - enemy.lastAttack > 1800) {
+    if (dist < 370 && time - enemy.lastAttack > 1450) {
       enemy.lastAttack = time;
       enemy.body.setVelocity(0);
       this.shootEnemyProjectile(enemy, targetX, targetY);
@@ -1028,7 +1178,13 @@ export default class WorldScene extends Phaser.Scene {
     this.allies.children.iterate((ally) => {
       if (!ally || !ally.active) return;
 
-      // Do not change target every frame. This prevents shaking/vibration.
+      this.updateAllyHealthBar(ally);
+
+      if (ally.role === "healer") {
+        this.updateHealerAlly(ally, time);
+        return;
+      }
+
       if (!ally.currentTarget || !ally.currentTarget.active || time > ally.nextTargetCheck) {
         const nearest = this.getNearestEnemy(ally);
         ally.currentTarget = nearest?.enemy ?? null;
@@ -1038,7 +1194,11 @@ export default class WorldScene extends Phaser.Scene {
       const enemy = ally.currentTarget;
 
       if (!enemy || !enemy.active) {
-        this.freeAllyWander(ally, time);
+        if (ally.role === "castleArcher") {
+          ally.body.setVelocity(0);
+        } else {
+          this.freeAllyWander(ally, time);
+        }
         return;
       }
 
@@ -1046,22 +1206,86 @@ export default class WorldScene extends Phaser.Scene {
 
       if (distance > ally.range) {
         ally.currentTarget = null;
-        this.freeAllyWander(ally, time);
+
+        if (ally.role === "castleArcher") {
+          ally.body.setVelocity(0);
+        } else {
+          this.freeAllyWander(ally, time);
+        }
         return;
       }
 
-      if (ally.type === "Knight") {
+      if (ally.role === "knight") {
         this.updateKnightAlly(ally, enemy, distance, time);
-      } else {
+      }
+
+      if (ally.role === "archer" || ally.role === "castleArcher") {
         this.updateArcherAlly(ally, enemy, distance, time);
       }
     });
   }
 
+  updateHealerAlly(ally, time) {
+    let target = null;
+    let lowestPercent = 1;
+
+    const playerPercent = this.playerStats.hp / this.playerStats.maxHp;
+    const playerDistance = Phaser.Math.Distance.Between(ally.x, ally.y, this.player.x, this.player.y);
+
+    if (playerPercent < lowestPercent && playerDistance < 260) {
+      lowestPercent = playerPercent;
+      target = "player";
+    }
+
+    this.allies.children.iterate((other) => {
+      if (!other || !other.active || other === ally) return;
+
+      const percent = other.hp / other.maxHp;
+      const distance = Phaser.Math.Distance.Between(ally.x, ally.y, other.x, other.y);
+
+      if (percent < lowestPercent && distance < 260) {
+        lowestPercent = percent;
+        target = other;
+      }
+    });
+
+    if (!target) {
+      this.freeAllyWander(ally, time);
+      return;
+    }
+
+    const targetX = target === "player" ? this.player.x : target.x;
+    const targetY = target === "player" ? this.player.y : target.y;
+    const distance = Phaser.Math.Distance.Between(ally.x, ally.y, targetX, targetY);
+
+    if (distance > 90) {
+      if (time > ally.nextMoveDecision) {
+        ally.nextMoveDecision = time + 450;
+        this.physics.moveTo(ally, targetX, targetY, ally.speed);
+      }
+    } else {
+      ally.body.setVelocity(0);
+    }
+
+    if (distance < 120 && time - ally.lastHeal > 1500) {
+      ally.lastHeal = time;
+
+      if (target === "player") {
+        this.playerStats.hp = Math.min(this.playerStats.maxHp, this.playerStats.hp + 12);
+        this.showFloatingText(this.player.x, this.player.y - 50, "+12 HP", "#22c55e");
+      } else {
+        target.hp = Math.min(target.maxHp, target.hp + 16);
+        this.updateAllyHealthBar(target);
+        this.showFloatingText(target.x, target.y - 50, "+16 HP", "#22c55e");
+      }
+
+      this.drawHealPulse(ally.x, ally.y);
+    }
+  }
+
   updateKnightAlly(ally, enemy, distance, time) {
     const stopDistance = 58;
 
-    // Movement decision is throttled. This avoids tiny back-and-forth corrections.
     if (distance > stopDistance) {
       if (time > ally.nextMoveDecision) {
         ally.nextMoveDecision = time + 220;
@@ -1091,39 +1315,59 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   updateArcherAlly(ally, enemy, distance, time) {
+    if (ally.role === "castleArcher") {
+      ally.body.setVelocity(0);
+
+      if (distance < ally.range && time - ally.lastAttack > 1150) {
+        ally.lastAttack = time;
+        this.shootProjectile(ally, enemy, ally.damage, 0xfacc15);
+      }
+
+      return;
+    }
+
     const dangerDistance = 145;
     const goodMin = 190;
     const goodMax = 295;
 
-    // Archers hold position when they are already in a good range.
-    // This removes the constant jitter while attacking.
     if (distance < dangerDistance) {
       if (time > ally.nextMoveDecision) {
         ally.nextMoveDecision = time + 450;
 
         const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, ally.x, ally.y);
-        ally.holdX = Phaser.Math.Clamp(ally.x + Math.cos(angle) * 120, 40, this.worldW - 40);
-        ally.holdY = Phaser.Math.Clamp(ally.y + Math.sin(angle) * 120, 40, this.worldH - 40);
+        ally.wanderX = Phaser.Math.Clamp(ally.x + Math.cos(angle) * 120, 40, this.worldW - 40);
+        ally.wanderY = Phaser.Math.Clamp(ally.y + Math.sin(angle) * 120, 40, this.worldH - 40);
 
-        this.physics.moveTo(ally, ally.holdX, ally.holdY, ally.speed);
+        this.physics.moveTo(ally, ally.wanderX, ally.wanderY, ally.speed);
       }
     } else if (distance > goodMax) {
       if (time > ally.nextMoveDecision) {
         ally.nextMoveDecision = time + 450;
         this.physics.moveTo(ally, enemy.x, enemy.y, ally.speed * 0.45);
       }
-    } else if (distance >= goodMin && distance <= goodMax) {
-      ally.body.setVelocity(0);
     } else {
       ally.body.setVelocity(0);
     }
 
-    if (distance < ally.range && time - ally.lastAttack > 1500) {
+    if (distance < ally.range && time - ally.lastAttack > 1450) {
       ally.lastAttack = time;
       ally.body.setVelocity(0);
       this.shootProjectile(ally, enemy, ally.damage, 0xfacc15);
     }
   }
+
+  drawHealPulse(x, y) {
+    const pulse = this.add.circle(x, y, 18, 0x22c55e, 0.22);
+
+    this.tweens.add({
+      targets: pulse,
+      scale: 2.2,
+      alpha: 0,
+      duration: 500,
+      onComplete: () => pulse.destroy(),
+    });
+  }
+
 
   freeAllyWander(ally, time) {
     if (time > ally.nextWander) {
@@ -1298,6 +1542,7 @@ export default class WorldScene extends Phaser.Scene {
 
   killEnemy(enemy) {
     this.playerStats.gold += enemy.gold;
+    this.playSound("coin");
     this.playerStats.xp += 10;
     this.playerStats.kills += 1;
 
@@ -1340,25 +1585,30 @@ export default class WorldScene extends Phaser.Scene {
   dropLoot(enemy) {
     const lootTable = {
       Goblin: ["goblinCoin"],
-      Orc: ["orcTooth"],
-      Wolf: ["wolfFur"],
-      Troll: ["trollBone"],
-      "Skeleton Archer": ["goblinCoin", "magicCrystal"],
-      "Dark Mage": ["magicCrystal"],
-      "Boss Orc": ["orcTooth", "trollBone", "magicCrystal"],
+      "Orc Warrior": ["orcTooth"],
+      "Orc Archer": ["orcTooth", "goblinCoin"],
+      "Armored Orc": ["orcTooth", "trollBone"],
+      "Troll Boss": ["orcTooth", "trollBone", "magicCrystal"],
     };
 
     const possible = lootTable[enemy.enemyType] ?? ["goblinCoin"];
-    const count = enemy.isBoss ? 3 : 1;
+    const count = enemy.isBoss ? 4 : 1;
 
     for (let i = 0; i < count; i++) {
-      if (!enemy.isBoss && Math.random() > 0.72) continue;
+      if (!enemy.isBoss && Math.random() > 0.7) continue;
 
       const type = Phaser.Math.RND.pick(possible);
       const x = enemy.x + Phaser.Math.Between(-20, 20);
       const y = enemy.y + Phaser.Math.Between(-20, 20);
 
-      const color = type === "magicCrystal" ? 0xa78bfa : type === "wolfFur" ? 0xcbd5e1 : 0xfacc15;
+      const color = type === "magicCrystal"
+        ? 0xa78bfa
+        : type === "wolfFur"
+          ? 0xcbd5e1
+          : type === "trollBone"
+            ? 0xe5e7eb
+            : 0xfacc15;
+
       const loot = this.add.circle(x, y, 9, color);
       this.physics.add.existing(loot);
 
@@ -1372,6 +1622,7 @@ export default class WorldScene extends Phaser.Scene {
       this.lootDrops.add(loot);
     }
   }
+
 
   collectLoot(loot) {
     if (!loot.active) return;
@@ -1454,6 +1705,7 @@ export default class WorldScene extends Phaser.Scene {
 
     this.playerStats.gold -= 20;
     this.playerStats.potions += 1;
+    this.playSound("coin");
     this.showMessage("Bought 1 health potion.");
     this.updatePanels();
   }
@@ -1475,6 +1727,7 @@ export default class WorldScene extends Phaser.Scene {
 
     this.playerStats.gold -= cost;
     this.playerStats.swordLevel += 1;
+    this.playSound("upgrade");
     this.playerStats.damage += 8;
     this.player.sword.setFillStyle(0xfacc15);
 
@@ -1496,6 +1749,7 @@ export default class WorldScene extends Phaser.Scene {
 
     this.playerStats.potions -= 1;
     this.playerStats.hp = Math.min(this.playerStats.maxHp, this.playerStats.hp + 45);
+    this.playSound("upgrade");
     this.showMessage("Used health potion. +45 HP.");
     this.updatePanels();
   }
@@ -1518,6 +1772,8 @@ export default class WorldScene extends Phaser.Scene {
 
     this.playerStats.gold -= 30;
     this.castleHealth = Math.min(this.maxCastleHealth, this.castleHealth + 90);
+    this.updateCastleDamageVisuals();
+    this.playSound("upgrade");
 
     this.updateQuestProgress("repair1", 1);
     this.showMessage("Castle repaired. +90 castle HP.");
@@ -1641,6 +1897,326 @@ export default class WorldScene extends Phaser.Scene {
     this.lootDrops.clear(true, true);
   }
 
+  damageAlly(ally, damage) {
+    if (!ally || !ally.active) return;
+
+    ally.hp -= damage;
+    this.showDamage(ally.x, ally.y, damage, "#ef4444");
+    this.playSound("hurt");
+
+    if (ally.hp <= 0) {
+      this.removeAlly(ally);
+    } else {
+      this.updateAllyHealthBar(ally);
+    }
+  }
+
+  removeAlly(ally) {
+    this.showFloatingText(ally.x, ally.y - 30, `${ally.type} fell`, "#ef4444");
+
+    if (ally.hpBar) ally.hpBar.destroy();
+    if (ally.hpBack) ally.hpBack.destroy();
+
+    const dust = this.add.circle(ally.x, ally.y, 22, 0xffffff, 0.25);
+    this.tweens.add({
+      targets: dust,
+      scale: 2,
+      alpha: 0,
+      duration: 280,
+      onComplete: () => dust.destroy(),
+    });
+
+    ally.destroy();
+  }
+
+  updateAllyHealthBar(ally) {
+    if (!ally.hpBar || !ally.hpBack) return;
+
+    ally.hpBack.x = ally.x;
+    ally.hpBack.y = ally.y - 46;
+
+    ally.hpBar.x = ally.x;
+    ally.hpBar.y = ally.y - 46;
+
+    const ratio = Phaser.Math.Clamp(ally.hp / ally.maxHp, 0, 1);
+    ally.hpBar.width = Math.max(0, 42 * ratio);
+
+    if (ally.hp <= 0) {
+      ally.hpBar.width = 0;
+    }
+  }
+
+
+  applyCastleDamage(amount) {
+    this.castleHealth = Math.max(0, this.castleHealth - amount);
+
+    this.playSound("castleHit");
+
+    if (this.time.now % 8 < 2) {
+      this.cameras.main.shake(55, 0.003);
+    }
+
+    this.showGateHitEffect();
+    this.updateCastleDamageVisuals();
+
+    if (this.castleHealth <= 0) {
+      this.gameOver();
+    }
+  }
+
+  createCastleDamageVisuals() {
+    this.castleCracks = [];
+    this.castleSmoke = [];
+
+    for (let i = 0; i < 5; i++) {
+      const crack = this.add.text(
+        Phaser.Math.Between(70, 175),
+        Phaser.Math.Between(365, 610),
+        "╱",
+        {
+          fontSize: "28px",
+          color: "#1f2937",
+          fontFamily: "monospace",
+        }
+      );
+
+      crack.setVisible(false);
+      this.castleCracks.push(crack);
+    }
+
+    for (let i = 0; i < 4; i++) {
+      const smoke = this.add.circle(
+        Phaser.Math.Between(90, 210),
+        Phaser.Math.Between(340, 620),
+        Phaser.Math.Between(10, 18),
+        0x6b7280,
+        0.32
+      );
+
+      smoke.setVisible(false);
+      this.castleSmoke.push(smoke);
+
+      this.tweens.add({
+        targets: smoke,
+        y: smoke.y - 22,
+        alpha: 0.08,
+        yoyo: true,
+        repeat: -1,
+        duration: Phaser.Math.Between(900, 1500),
+      });
+    }
+  }
+
+  updateCastleDamageVisuals() {
+    if (!this.castleCracks || !this.castleSmoke) return;
+
+    const hpPercent = this.castleHealth / this.maxCastleHealth;
+
+    this.castleCracks.forEach((crack, index) => {
+      crack.setVisible(hpPercent < 0.8 - index * 0.12);
+    });
+
+    this.castleSmoke.forEach((smoke, index) => {
+      smoke.setVisible(hpPercent < 0.55 - index * 0.09);
+    });
+  }
+
+  showGateHitEffect() {
+    const hit = this.add.circle(this.castleGatePoint.x, this.castleGatePoint.y, 18, 0xef4444, 0.32);
+
+    this.tweens.add({
+      targets: hit,
+      scale: 2.2,
+      alpha: 0,
+      duration: 180,
+      onComplete: () => hit.destroy(),
+    });
+  }
+
+  updateBossSpecials(enemy, time) {
+    if (time > enemy.nextBossStomp) {
+      enemy.nextBossStomp = time + 4500;
+      this.bossStomp(enemy);
+    }
+
+    if (time > enemy.nextBossSummon) {
+      enemy.nextBossSummon = time + 9000;
+      this.bossSummon(enemy);
+    }
+  }
+
+  bossStomp(enemy) {
+    const radius = 150;
+
+    const ring = this.add.circle(enemy.x, enemy.y, radius, 0xef4444, 0.15);
+    ring.setDepth(90);
+
+    this.tweens.add({
+      targets: ring,
+      scale: 1.25,
+      alpha: 0,
+      duration: 450,
+      onComplete: () => ring.destroy(),
+    });
+
+    const playerDist = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y);
+    if (playerDist < radius) {
+      this.playerStats.hp -= 24;
+      this.showDamage(this.player.x, this.player.y, 24, "#ef4444");
+      this.cameras.main.shake(160, 0.009);
+
+      if (this.playerStats.hp <= 0) {
+        this.respawnPlayer();
+      }
+    }
+
+    this.allies.children.iterate((ally) => {
+      if (!ally || !ally.active) return;
+
+      const dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, ally.x, ally.y);
+      if (dist < radius) {
+        this.damageAlly(ally, 22);
+      }
+    });
+
+    this.playSound("boss");
+    this.showMessage("Boss stomp attack!");
+  }
+
+  bossSummon(enemy) {
+    for (let i = 0; i < 3; i++) {
+      this.spawnEnemy(
+        enemy.x + Phaser.Math.Between(-90, 90),
+        enemy.y + Phaser.Math.Between(-90, 90),
+        false
+      );
+    }
+
+    this.showMessage("Boss summoned minions!");
+    this.playSound("summon");
+  }
+
+  sellAllLoot() {
+    if (!this.isNearShopNPC()) {
+      this.showMessage("Stand near Merchant or Blacksmith to sell loot.");
+      this.shopOpen = false;
+      this.updatePanels();
+      return;
+    }
+
+    const loot = this.playerStats.loot;
+
+    const total =
+      loot.goblinCoin * 3 +
+      loot.wolfFur * 5 +
+      loot.orcTooth * 8 +
+      loot.trollBone * 14 +
+      loot.magicCrystal * 25;
+
+    if (total <= 0) {
+      this.showMessage("No loot to sell.");
+      return;
+    }
+
+    this.playerStats.gold += total;
+
+    loot.goblinCoin = 0;
+    loot.wolfFur = 0;
+    loot.orcTooth = 0;
+    loot.trollBone = 0;
+    loot.magicCrystal = 0;
+
+    this.showMessage(`Sold all loot for ${total} gold.`);
+    this.playSound("coin");
+    this.updatePanels();
+  }
+
+  buyUpgrade(type) {
+    const costs = {
+      hp: 70,
+      damage: 90,
+      castle: 120,
+      allies: 100,
+    };
+
+    const cost = costs[type];
+
+    if (this.playerStats.gold < cost) {
+      this.showMessage(`Not enough gold. Need ${cost}.`);
+      return;
+    }
+
+    this.playerStats.gold -= cost;
+
+    if (type === "hp") {
+      this.playerStats.maxHp += 20;
+      this.playerStats.hp = this.playerStats.maxHp;
+      this.showMessage("Upgrade bought: Max HP +20.");
+    }
+
+    if (type === "damage") {
+      this.playerStats.damage += 8;
+      this.showMessage("Upgrade bought: Player damage +8.");
+    }
+
+    if (type === "castle") {
+      this.maxCastleHealth += 100;
+      this.castleHealth += 100;
+      this.showMessage("Upgrade bought: Castle max HP +100.");
+    }
+
+    if (type === "allies") {
+      this.allies.children.iterate((ally) => {
+        if (!ally || !ally.active) return;
+        ally.maxHp += 25;
+        ally.hp += 25;
+        this.updateAllyHealthBar(ally);
+      });
+
+      this.showMessage("Upgrade bought: all allies HP +25.");
+    }
+
+    this.playSound("upgrade");
+    this.updatePanels();
+  }
+
+  playSound(type) {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!this.audioCtx) {
+        this.audioCtx = new AudioContext();
+      }
+
+      const osc = this.audioCtx.createOscillator();
+      const gain = this.audioCtx.createGain();
+
+      const sounds = {
+        attack: [220, 0.04],
+        hurt: [110, 0.06],
+        coin: [720, 0.05],
+        upgrade: [520, 0.08],
+        castleHit: [80, 0.05],
+        boss: [65, 0.16],
+        summon: [180, 0.12],
+        tick: [440, 0.03],
+        wave: [330, 0.08],
+      };
+
+      const [freq, duration] = sounds[type] ?? [300, 0.05];
+
+      osc.frequency.value = freq;
+      gain.gain.value = 0.04;
+
+      osc.connect(gain);
+      gain.connect(this.audioCtx.destination);
+
+      osc.start();
+      osc.stop(this.audioCtx.currentTime + duration);
+    } catch {
+      // Ignore audio errors. Some browsers block sound until first interaction.
+    }
+  }
+
   getNearestEnemy(source) {
     let nearestEnemy = null;
     let nearestDistance = Infinity;
@@ -1683,17 +2259,41 @@ export default class WorldScene extends Phaser.Scene {
     if (!enemy.hpBar || !enemy.hpBack) return;
 
     enemy.hpBack.x = enemy.x;
-    enemy.hpBack.y = enemy.y - 48;
+    enemy.hpBack.y = enemy.y - 52;
 
     enemy.hpBar.x = enemy.x;
-    enemy.hpBar.y = enemy.y - 48;
-    enemy.hpBar.width = Math.max(3, 44 * (enemy.hp / enemy.maxHp));
+    enemy.hpBar.y = enemy.y - 52;
+
+    const ratio = Phaser.Math.Clamp(enemy.hp / enemy.maxHp, 0, 1);
+    enemy.hpBar.width = Math.max(0, 48 * ratio);
+
+    if (enemy.hp <= 0) {
+      enemy.hpBar.width = 0;
+    }
+
+    if (enemy.nameLabel) {
+      enemy.nameLabel.x = enemy.x - 42;
+      enemy.nameLabel.y = enemy.y - 70;
+    }
   }
+
 
   updateLabels() {
     this.playerLabel.x = this.player.x - 22;
     this.playerLabel.y = this.player.y - 60;
+
+    this.allies.children.iterate((ally) => {
+      if (!ally || !ally.active) return;
+
+      if (ally.nameLabel) {
+        ally.nameLabel.x = ally.x - 42;
+        ally.nameLabel.y = ally.y - 64;
+      }
+
+      this.updateAllyHealthBar(ally);
+    });
   }
+
 
   updateUI() {
     this.goldText.setText(
@@ -1725,9 +2325,11 @@ export default class WorldScene extends Phaser.Scene {
         "B Shop",
         "I Bag",
         "Q Quest",
+        "O Upgrades",
         "U Potion",
         "R Repair",
         "P Save",
+        "4 Sell loot",
         "L Load",
         "ESC Pause",
         "H Hide",
@@ -1746,6 +2348,7 @@ export default class WorldScene extends Phaser.Scene {
           "1 Potion: 20 gold",
           `2 Sword upgrade: ${swordCost} gold`,
           "3 Castle repair: 30 gold",
+          "4 Sell all loot",
           "B Close shop",
         ].join("\n")
       );
@@ -1790,12 +2393,30 @@ export default class WorldScene extends Phaser.Scene {
       this.questPanel.setText("");
       this.questPanel.setVisible(false);
     }
+
+    if (this.upgradeOpen) {
+      this.upgradePanel.setVisible(true);
+      this.upgradePanel.setText(
+        [
+          "UPGRADES",
+          "1 Max HP +20: 70 gold",
+          "2 Damage +8: 90 gold",
+          "3 Castle max +100: 120 gold",
+          "4 Allies HP +25: 100 gold",
+          "O Close upgrades",
+        ].join("\n")
+      );
+    } else {
+      this.upgradePanel.setText("");
+      this.upgradePanel.setVisible(false);
+    }
   }
 
   updatePausePanel() {
     if (!this.isPaused) {
       this.pausePanel.setText("");
-      this.pausePanel.setVisible(false);
+      this.upgradePanel.setVisible(false);
+    this.pausePanel.setVisible(false);
       return;
     }
 
@@ -1805,6 +2426,7 @@ export default class WorldScene extends Phaser.Scene {
         "PAUSED",
         "ESC Resume",
         "P Save",
+        "4 Sell loot",
         "L Load",
       ].join("\n")
     );
