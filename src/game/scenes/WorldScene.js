@@ -8,7 +8,6 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   create() {
-    this.gameVersion = "v0.13";
     this.worldW = 1800;
     this.worldH = 1100;
 
@@ -784,8 +783,8 @@ export default class WorldScene extends Phaser.Scene {
     this.menuPanel.setScrollFactor(0);
     this.menuPanel.setDepth(20001);
 
-    this.menuTitle = this.add.text(480, 165, "KINGDOM FRONTIER 2D  v0.13", {
-      fontSize: "30px",
+    this.menuTitle = this.add.text(480, 165, "KINGDOM FRONTIER 2D", {
+      fontSize: "34px",
       color: "#facc15",
       fontFamily: "monospace",
       fontStyle: "bold",
@@ -794,17 +793,6 @@ export default class WorldScene extends Phaser.Scene {
     this.menuTitle.setOrigin(0.5);
     this.menuTitle.setScrollFactor(0);
     this.menuTitle.setDepth(20002);
-
-    this.versionText = this.add.text(480, 188, this.gameVersion, {
-      fontSize: "16px",
-      color: "#93c5fd",
-      fontFamily: "monospace",
-      align: "center",
-    });
-    this.versionText.setOrigin(0.5);
-    this.versionText.setScrollFactor(0);
-    this.versionText.setDepth(20002);
-    this.versionText.setVisible(false);
 
     this.menuText = this.add.text(480, 280, "", {
       fontSize: "18px",
@@ -827,7 +815,6 @@ export default class WorldScene extends Phaser.Scene {
       [
         "N  New Game",
         "L  Load Game",
-        "X  Delete Save",
         `M  Sound: ${this.soundEnabled ? "ON" : "OFF"}`,
         "",
         "Goal: defend the castle and survive waves.",
@@ -842,7 +829,6 @@ export default class WorldScene extends Phaser.Scene {
       this.menuOverlay,
       this.menuPanel,
       this.menuTitle,
-      this.versionText,
       this.menuText,
     ]) {
       if (item) item.setVisible(false);
