@@ -24,6 +24,8 @@ export default class WorldScene extends Phaser.Scene {
     this.upgradeOpen = false;
     this.isPaused = false;
     this.gameEnded = false;
+    this.mainMenuOpen = true;
+    this.soundEnabled = true;
     this.lastSavedText = "Never";
 
     this.playerStats = {
@@ -37,6 +39,8 @@ export default class WorldScene extends Phaser.Scene {
       damage: 28,
       potions: 2,
       swordLevel: 1,
+      allyUpgradeLevel: 1,
+      castleArcherLevel: 1,
       kills: 0,
       bossKills: 0,
       loot: {
@@ -108,9 +112,11 @@ export default class WorldScene extends Phaser.Scene {
     this.createCamera();
     this.createCombat();
     this.createFixedUI();
+    this.createMainMenu();
     this.spawnWave();
 
-    this.showMessage("V04 loaded. Shop and repair now require correct location. Press H for keys.");
+    this.physics.world.pause();
+    this.showMessage("Main menu open. Press N for new game or L to load.");
   }
 
   createWorld() {
@@ -594,7 +600,10 @@ export default class WorldScene extends Phaser.Scene {
       TWO: Phaser.Input.Keyboard.KeyCodes.TWO,
       THREE: Phaser.Input.Keyboard.KeyCodes.THREE,
       FOUR: Phaser.Input.Keyboard.KeyCodes.FOUR,
+      FIVE: Phaser.Input.Keyboard.KeyCodes.FIVE,
       O: Phaser.Input.Keyboard.KeyCodes.O,
+      N: Phaser.Input.Keyboard.KeyCodes.N,
+      M: Phaser.Input.Keyboard.KeyCodes.M,
     });
   }
 
@@ -763,6 +772,71 @@ export default class WorldScene extends Phaser.Scene {
     this.updateHelpPanel();
     this.updatePanels();
     this.updatePausePanel();
+  }
+
+  createMainMenu() {
+    this.menuOverlay = this.add.rectangle(480, 270, 960, 540, 0x020617, 0.86);
+    this.menuOverlay.setScrollFactor(0);
+    this.menuOverlay.setDepth(20000);
+
+    this.menuPanel = this.add.rectangle(480, 270, 620, 320, 0x111827, 0.96);
+    this.menuPanel.setScrollFactor(0);
+    this.menuPanel.setDepth(20001);
+
+    this.menuTitle = this.add.text(480, 165, "KINGDOM FRONTIER 2D", {
+      fontSize: "34px",
+      color: "#facc15",
+      fontFamily: "monospace",
+      fontStyle: "bold",
+      align: "center",
+    });
+    this.menuTitle.setOrigin(0.5);
+    this.menuTitle.setScrollFactor(0);
+    this.menuTitle.setDepth(20002);
+
+    this.menuText = this.add.text(480, 280, "", {
+      fontSize: "18px",
+      color: "#ffffff",
+      fontFamily: "monospace",
+      align: "center",
+      lineSpacing: 10,
+    });
+    this.menuText.setOrigin(0.5);
+    this.menuText.setScrollFactor(0);
+    this.menuText.setDepth(20002);
+
+    this.updateMainMenuText();
+  }
+
+  updateMainMenuText() {
+    if (!this.menuText) return;
+
+    this.menuText.setText(
+      [
+        "N  New Game",
+        "L  Load Game",
+        `M  Sound: ${this.soundEnabled ? "ON" : "OFF"}`,
+        "",
+        "Goal: defend the castle and survive waves.",
+      ].join("\n")
+    );
+  }
+
+  hideMainMenu() {
+    this.mainMenuOpen = false;
+
+    for (const item of [
+      this.menuOverlay,
+      this.menuPanel,
+      this.menuTitle,
+      this.menuText,
+    ]) {
+      if (item) item.setVisible(false);
+    }
+
+    this.isPaused = false;
+    this.physics.world.resume();
+    this.showMessage("Game started. Press H for controls.");
   }
 
   spawnWave() {
@@ -1093,6 +1167,11 @@ export default class WorldScene extends Phaser.Scene {
       return;
     }
 
+    if (this.mainMenuOpen) {
+      this.handleMainMenuHotkeys();
+      return;
+    }
+
     this.handleHotkeys(time);
 
     if (this.isPaused) {
@@ -1114,6 +1193,24 @@ export default class WorldScene extends Phaser.Scene {
     }
   }
 
+  handleMainMenuHotkeys() {
+    if (Phaser.Input.Keyboard.JustDown(this.keys.N)) {
+      this.playSound("wave");
+      this.hideMainMenu();
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.keys.L)) {
+      this.loadGame();
+      this.hideMainMenu();
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.keys.M)) {
+      this.soundEnabled = !this.soundEnabled;
+      this.updateMainMenuText();
+      this.showMessage(`Sound ${this.soundEnabled ? "enabled" : "disabled"}.`);
+    }
+  }
+
   handleHotkeys(time) {
     if (Phaser.Input.Keyboard.JustDown(this.keys.ESC)) {
       this.togglePause();
@@ -1122,6 +1219,12 @@ export default class WorldScene extends Phaser.Scene {
 
     if (Phaser.Input.Keyboard.JustDown(this.keys.H)) {
       this.helpVisible = !this.helpVisible;
+      this.updateHelpPanel();
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.keys.M)) {
+      this.soundEnabled = !this.soundEnabled;
+      this.showMessage(`Sound ${this.soundEnabled ? "ON" : "OFF"}.`);
       this.updateHelpPanel();
     }
 
@@ -1173,6 +1276,7 @@ export default class WorldScene extends Phaser.Scene {
     if (this.upgradeOpen && !this.shopOpen && Phaser.Input.Keyboard.JustDown(this.keys.TWO)) this.buyUpgrade("damage");
     if (this.upgradeOpen && !this.shopOpen && Phaser.Input.Keyboard.JustDown(this.keys.THREE)) this.buyUpgrade("castle");
     if (this.upgradeOpen && !this.shopOpen && Phaser.Input.Keyboard.JustDown(this.keys.FOUR)) this.buyUpgrade("allies");
+    if (this.upgradeOpen && !this.shopOpen && Phaser.Input.Keyboard.JustDown(this.keys.FIVE)) this.buyUpgrade("tower");
   }
 
   togglePause() {
@@ -1310,6 +1414,7 @@ export default class WorldScene extends Phaser.Scene {
 
       if (targetKind === "player" && time - enemy.lastAttack > 700) {
         enemy.lastAttack = time;
+        this.animateMeleeAttack(enemy);
         this.playerStats.hp -= enemy.damage;
         this.showDamage(this.player.x, this.player.y, enemy.damage, "#ef4444");
         this.cameras.main.shake(90, 0.006);
@@ -1322,6 +1427,7 @@ export default class WorldScene extends Phaser.Scene {
 
       if (targetKind === "ally" && enemy.currentTargetRef && enemy.currentTargetRef.active && time - enemy.lastAttack > 780) {
         enemy.lastAttack = time;
+        this.animateMeleeAttack(enemy);
         this.damageAlly(enemy.currentTargetRef, enemy.damage);
       }
 
@@ -1429,27 +1535,29 @@ export default class WorldScene extends Phaser.Scene {
 
   updateHealerAlly(ally, time) {
     let target = null;
-    let lowestPercent = 1;
-
-    const playerPercent = this.playerStats.hp / this.playerStats.maxHp;
-    const playerDistance = Phaser.Math.Distance.Between(ally.x, ally.y, this.player.x, this.player.y);
-
-    if (playerPercent < lowestPercent && playerDistance < 260) {
-      lowestPercent = playerPercent;
-      target = "player";
-    }
+    let lowestScore = 1;
 
     this.allies.children.iterate((other) => {
       if (!other || !other.active || other === ally) return;
 
-      const percent = other.hp / other.maxHp;
       const distance = Phaser.Math.Distance.Between(ally.x, ally.y, other.x, other.y);
+      if (distance > 300) return;
 
-      if (percent < lowestPercent && distance < 260) {
-        lowestPercent = percent;
+      const hpPercent = other.hp / other.maxHp;
+
+      if (hpPercent < lowestScore) {
+        lowestScore = hpPercent;
         target = other;
       }
     });
+
+    const playerPercent = this.playerStats.hp / this.playerStats.maxHp;
+    const playerDistance = Phaser.Math.Distance.Between(ally.x, ally.y, this.player.x, this.player.y);
+
+    if (!target && playerPercent < 0.85 && playerDistance < 300) {
+      target = "player";
+      lowestScore = playerPercent;
+    }
 
     if (!target) {
       this.freeAllyWander(ally, time);
@@ -1460,7 +1568,7 @@ export default class WorldScene extends Phaser.Scene {
     const targetY = target === "player" ? this.player.y : target.y;
     const distance = Phaser.Math.Distance.Between(ally.x, ally.y, targetX, targetY);
 
-    if (distance > 90) {
+    if (distance > 95) {
       if (time > ally.nextMoveDecision) {
         ally.nextMoveDecision = time + 450;
         this.physics.moveTo(ally, targetX, targetY, ally.speed);
@@ -1469,21 +1577,23 @@ export default class WorldScene extends Phaser.Scene {
       ally.body.setVelocity(0);
     }
 
-    if (distance < 120 && time - ally.lastHeal > 1500) {
+    if (distance < 130 && time - ally.lastHeal > 1250) {
       ally.lastHeal = time;
 
       if (target === "player") {
-        this.playerStats.hp = Math.min(this.playerStats.maxHp, this.playerStats.hp + 12);
-        this.showFloatingText(this.player.x, this.player.y - 50, "+12 HP", "#22c55e");
+        this.playerStats.hp = Math.min(this.playerStats.maxHp, this.playerStats.hp + 14);
+        this.showFloatingText(this.player.x, this.player.y - 50, "+14 HP", "#22c55e");
       } else {
-        target.hp = Math.min(target.maxHp, target.hp + 16);
+        target.hp = Math.min(target.maxHp, target.hp + 18);
         this.updateAllyHealthBar(target);
-        this.showFloatingText(target.x, target.y - 50, "+16 HP", "#22c55e");
+        this.showFloatingText(target.x, target.y - 50, "+18 HP", "#22c55e");
       }
 
       this.drawHealPulse(ally.x, ally.y);
+      this.playSound("heal");
     }
   }
+
 
   updateKnightAlly(ally, enemy, distance, time) {
     const stopDistance = 58;
@@ -1501,6 +1611,7 @@ export default class WorldScene extends Phaser.Scene {
       ally.lastAttack = time;
       ally.body.setVelocity(0);
 
+      this.animateMeleeAttack(ally);
       enemy.hp -= ally.damage;
       this.showDamage(enemy.x, enemy.y, ally.damage, "#93c5fd");
 
@@ -1603,21 +1714,28 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   shootProjectile(from, target, damage, color) {
-    const projectile = this.add.circle(from.x, from.y, 6, color);
-    projectile.trail = this.add.circle(from.x, from.y, 10, color, 0.18);
+    this.animateRangedAttack(from);
+
+    const angle = Phaser.Math.Angle.Between(from.x, from.y, target.x, target.y);
+
+    const projectile = this.add.rectangle(from.x, from.y, 28, 4, color);
+    projectile.setRotation(angle);
+
+    projectile.trail = this.add.rectangle(from.x, from.y, 18, 3, color, 0.28);
+    projectile.trail.setRotation(angle);
 
     this.physics.add.existing(projectile);
 
     projectile.damage = damage;
     this.projectiles.add(projectile);
 
-    this.physics.moveTo(projectile, target.x, target.y, 420);
+    this.physics.moveTo(projectile, target.x, target.y, 440);
+    this.playSound("arrow");
 
     this.tweens.add({
       targets: projectile.trail,
-      scale: 0.2,
       alpha: 0,
-      duration: 500,
+      duration: 250,
       onComplete: () => projectile.trail?.destroy(),
     });
 
@@ -1627,17 +1745,102 @@ export default class WorldScene extends Phaser.Scene {
     });
   }
 
+
   shootEnemyProjectile(enemy, targetX, targetY) {
-    const color = enemy.enemyType === "Dark Mage" ? 0xa78bfa : 0xe5e7eb;
-    const projectile = this.add.circle(enemy.x, enemy.y, 6, color);
+    this.animateRangedAttack(enemy);
+
+    const color = enemy.enemyType === "Orc Archer" ? 0x111827 : 0xa78bfa;
+    const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, targetX, targetY);
+
+    const projectile = this.add.rectangle(enemy.x, enemy.y, 30, 5, color);
+    projectile.setRotation(angle);
+
+    projectile.trail = this.add.rectangle(enemy.x, enemy.y, 20, 4, 0xef4444, 0.25);
+    projectile.trail.setRotation(angle);
+
     this.physics.add.existing(projectile);
 
     projectile.damage = enemy.damage;
     this.enemyProjectiles.add(projectile);
-    this.physics.moveTo(projectile, targetX, targetY, 320);
+
+    this.physics.moveTo(projectile, targetX, targetY, 350);
+    this.playSound("arrow");
+
+    this.tweens.add({
+      targets: projectile.trail,
+      alpha: 0,
+      duration: 300,
+      onComplete: () => projectile.trail?.destroy(),
+    });
 
     this.time.delayedCall(1500, () => {
       if (projectile.active) projectile.destroy();
+      if (projectile.trail?.active) projectile.trail.destroy();
+    });
+  }
+
+
+  animateMeleeAttack(unit) {
+    if (!unit || !unit.active) return;
+
+    this.tweens.add({
+      targets: unit.weapon || unit.bodyShape,
+      angle: 35,
+      duration: 80,
+      yoyo: true,
+      ease: "Sine.easeOut",
+    });
+
+    this.tweens.add({
+      targets: unit.bodyShape,
+      scaleX: 1.14,
+      scaleY: 1.14,
+      duration: 80,
+      yoyo: true,
+    });
+
+    this.playSound("attack");
+  }
+
+  animateRangedAttack(unit) {
+    if (!unit || !unit.active) return;
+
+    this.tweens.add({
+      targets: unit.weapon || unit.bodyShape,
+      scaleX: 1.18,
+      scaleY: 1.18,
+      duration: 90,
+      yoyo: true,
+    });
+  }
+
+  animateDeath(unit, onComplete) {
+    if (!unit || !unit.active) {
+      if (onComplete) onComplete();
+      return;
+    }
+
+    unit.setActive(false);
+
+    if (unit.body) {
+      unit.body.setVelocity(0);
+      unit.body.enable = false;
+    }
+
+    this.playSound("death");
+
+    this.tweens.add({
+      targets: unit,
+      alpha: 0,
+      angle: unit.isBoss ? 0 : 70,
+      scaleX: unit.isBoss ? 1.1 : 0.7,
+      scaleY: unit.isBoss ? 0.7 : 0.7,
+      duration: unit.isBoss ? 700 : 320,
+      ease: "Sine.easeIn",
+      onComplete: () => {
+        if (onComplete) onComplete();
+        unit.destroy();
+      },
     });
   }
 
@@ -1706,6 +1909,7 @@ export default class WorldScene extends Phaser.Scene {
     this.gameEnded = true;
     this.isPaused = true;
     this.physics.world.pause();
+    this.playSound("gameOver");
 
     this.player.body.setVelocity(0);
     this.playerStats.hp = 0;
@@ -1743,6 +1947,8 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   killEnemy(enemy) {
+    if (!enemy || !enemy.active) return;
+
     this.playerStats.gold += enemy.gold;
     this.playSound("coin");
     this.playerStats.xp += 10;
@@ -1770,19 +1976,21 @@ export default class WorldScene extends Phaser.Scene {
 
     if (enemy.hpBar) enemy.hpBar.destroy();
     if (enemy.hpBack) enemy.hpBack.destroy();
+    if (enemy.nameLabel) enemy.nameLabel.destroy();
 
-    const death = this.add.circle(enemy.x, enemy.y, 18, 0xffffff, 0.25);
+    const death = this.add.circle(enemy.x, enemy.y, enemy.isBoss ? 38 : 18, 0xffffff, 0.25);
 
     this.tweens.add({
       targets: death,
-      scale: 2,
+      scale: enemy.isBoss ? 3 : 2,
       alpha: 0,
-      duration: 250,
+      duration: enemy.isBoss ? 600 : 250,
       onComplete: () => death.destroy(),
     });
 
-    enemy.destroy();
+    this.animateDeath(enemy);
   }
+
 
   dropLoot(enemy) {
     const lootTable = {
@@ -2114,10 +2322,13 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   removeAlly(ally) {
+    if (!ally || !ally.active) return;
+
     this.showFloatingText(ally.x, ally.y - 30, `${ally.type} fell`, "#ef4444");
 
     if (ally.hpBar) ally.hpBar.destroy();
     if (ally.hpBack) ally.hpBack.destroy();
+    if (ally.nameLabel) ally.nameLabel.destroy();
 
     const dust = this.add.circle(ally.x, ally.y, 22, 0xffffff, 0.25);
     this.tweens.add({
@@ -2128,8 +2339,9 @@ export default class WorldScene extends Phaser.Scene {
       onComplete: () => dust.destroy(),
     });
 
-    ally.destroy();
+    this.animateDeath(ally);
   }
+
 
   updateAllyHealthBar(ally) {
     if (!ally.hpBar || !ally.hpBack) return;
@@ -2234,16 +2446,30 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   updateBossSpecials(enemy, time) {
+    if (!enemy.phaseTwo && enemy.hp <= enemy.maxHp * 0.5) {
+      enemy.phaseTwo = true;
+      enemy.speed += 8;
+      enemy.damage += 12;
+      enemy.bodyShape?.setFillStyle?.(0xb91c1c);
+      this.showMessage("Troll Boss enraged. Phase 2 started.");
+      this.cameras.main.shake(220, 0.012);
+      this.playSound("boss");
+    }
+
+    const stompDelay = enemy.phaseTwo ? 2800 : 4500;
+    const summonDelay = enemy.phaseTwo ? 6200 : 9000;
+
     if (time > enemy.nextBossStomp) {
-      enemy.nextBossStomp = time + 4500;
+      enemy.nextBossStomp = time + stompDelay;
       this.bossStomp(enemy);
     }
 
     if (time > enemy.nextBossSummon) {
-      enemy.nextBossSummon = time + 9000;
+      enemy.nextBossSummon = time + summonDelay;
       this.bossSummon(enemy);
     }
   }
+
 
   bossStomp(enemy) {
     const radius = 150;
@@ -2337,6 +2563,7 @@ export default class WorldScene extends Phaser.Scene {
       damage: 90,
       castle: 120,
       allies: 100,
+      tower: 150,
     };
 
     const cost = costs[type];
@@ -2366,21 +2593,51 @@ export default class WorldScene extends Phaser.Scene {
     }
 
     if (type === "allies") {
+      this.playerStats.allyUpgradeLevel += 1;
+
       this.allies.children.iterate((ally) => {
         if (!ally || !ally.active) return;
+
         ally.maxHp += 25;
         ally.hp += 25;
+
+        if (ally.role !== "healer") {
+          ally.damage += 3;
+        }
+
         this.updateAllyHealthBar(ally);
       });
 
-      this.showMessage("Upgrade bought: all allies HP +25.");
+      this.showMessage(`Ally units upgraded to Lv ${this.playerStats.allyUpgradeLevel}.`);
+    }
+
+    if (type === "tower") {
+      this.playerStats.castleArcherLevel += 1;
+
+      this.allies.children.iterate((ally) => {
+        if (!ally || !ally.active) return;
+
+        if (ally.role === "castleArcher") {
+          ally.damage += 5;
+          ally.range += 35;
+          ally.maxHp += 35;
+          ally.hp = ally.maxHp;
+          ally.bodyShape?.setFillStyle?.(0xfbbf24);
+          this.updateAllyHealthBar(ally);
+        }
+      });
+
+      this.showMessage(`Castle Archer tower upgraded to Lv ${this.playerStats.castleArcherLevel}.`);
     }
 
     this.playSound("upgrade");
     this.updatePanels();
   }
 
+
   playSound(type) {
+    if (!this.soundEnabled) return;
+
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       if (!this.audioCtx) {
@@ -2392,6 +2649,7 @@ export default class WorldScene extends Phaser.Scene {
 
       const sounds = {
         attack: [220, 0.04],
+        arrow: [520, 0.04],
         hurt: [110, 0.06],
         coin: [720, 0.05],
         upgrade: [520, 0.08],
@@ -2400,12 +2658,15 @@ export default class WorldScene extends Phaser.Scene {
         summon: [180, 0.12],
         tick: [440, 0.03],
         wave: [330, 0.08],
+        death: [140, 0.12],
+        heal: [620, 0.08],
+        gameOver: [60, 0.22],
       };
 
       const [freq, duration] = sounds[type] ?? [300, 0.05];
 
       osc.frequency.value = freq;
-      gain.gain.value = 0.04;
+      gain.gain.value = 0.045;
 
       osc.connect(gain);
       gain.connect(this.audioCtx.destination);
@@ -2413,9 +2674,10 @@ export default class WorldScene extends Phaser.Scene {
       osc.start();
       osc.stop(this.audioCtx.currentTime + duration);
     } catch {
-      // Ignore audio errors. Some browsers block sound until first interaction.
+      // Browser may block sound until first user interaction.
     }
   }
+
 
   getNearestEnemy(source) {
     let nearestEnemy = null;
@@ -2524,6 +2786,8 @@ export default class WorldScene extends Phaser.Scene {
         "I Bag",
         "Q Quest",
         "O Upgrades",
+        "M Sound",
+        "N New game menu",
         "U Potion",
         "R Repair",
         "P Save",
@@ -2600,7 +2864,8 @@ export default class WorldScene extends Phaser.Scene {
           "1 Max HP +20: 70 gold",
           "2 Damage +8: 90 gold",
           "3 Castle max +100: 120 gold",
-          "4 Allies HP +25: 100 gold",
+          "4 Ally level +1: 100 gold",
+          "5 Castle archer tower +1: 150 gold",
           "O Close upgrades",
         ].join("\n")
       );
@@ -2699,6 +2964,7 @@ export default class WorldScene extends Phaser.Scene {
     this.gameEnded = true;
     this.isPaused = true;
     this.physics.world.pause();
+    this.playSound("gameOver");
 
     const overlay = this.add.rectangle(480, 270, 960, 540, 0x000000, 0.72);
     overlay.setScrollFactor(0);
