@@ -22,6 +22,7 @@ export default class WorldScene extends Phaser.Scene {
     this.inventoryOpen = false;
     this.questOpen = false;
     this.isPaused = false;
+    this.gameEnded = false;
     this.lastSavedText = "Never";
 
     this.playerStats = {
@@ -95,6 +96,7 @@ export default class WorldScene extends Phaser.Scene {
     ];
 
     this.createWorld();
+    this.createBattlefieldPolish();
     this.createCastle();
     this.createPlayer();
     this.createNPCs();
@@ -163,6 +165,63 @@ export default class WorldScene extends Phaser.Scene {
     this.drawStall(640, 830, 0x38bdf8);
   }
 
+  createBattlefieldPolish() {
+    // Small visual details that make the map feel less empty.
+
+    // Flowers and grass details
+    for (let i = 0; i < 160; i++) {
+      const x = Phaser.Math.Between(60, this.worldW - 60);
+      const y = Phaser.Math.Between(80, this.worldH - 60);
+
+      // Avoid too many flowers inside dense forest, keep them mostly visible
+      const color = Phaser.Math.RND.pick([0xfacc15, 0xf472b6, 0xffffff, 0xa7f3d0]);
+      this.add.circle(x, y, Phaser.Math.Between(2, 4), color, 0.75);
+    }
+
+    // Road stones
+    for (let i = 0; i < 45; i++) {
+      const x = Phaser.Math.Between(220, 1120);
+      const y = Phaser.Math.Between(505, 565);
+      this.add.ellipse(x, y, Phaser.Math.Between(10, 20), Phaser.Math.Between(5, 10), 0x9ca3af, 0.45);
+    }
+
+    // River highlights
+    for (let i = 0; i < 18; i++) {
+      this.add.ellipse(
+        Phaser.Math.Between(690, 1110),
+        Phaser.Math.Between(160, 255),
+        Phaser.Math.Between(50, 100),
+        Phaser.Math.Between(6, 12),
+        0x93c5fd,
+        0.35
+      );
+    }
+
+    // Castle flags
+    this.add.rectangle(45, 245, 6, 70, 0x1f2937);
+    this.add.triangle(70, 230, 48, 210, 48, 250, 0xef4444);
+
+    this.add.rectangle(195, 245, 6, 70, 0x1f2937);
+    this.add.triangle(220, 230, 198, 210, 198, 250, 0x2563eb);
+
+    // Campfires near village
+    this.drawCampfire(705, 815);
+    this.drawCampfire(245, 730);
+
+    // Subtle map border
+    const border = this.add.graphics();
+    border.lineStyle(10, 0x0f172a, 0.35);
+    border.strokeRect(5, 5, this.worldW - 10, this.worldH - 10);
+  }
+
+  drawCampfire(x, y) {
+    this.add.ellipse(x, y + 12, 46, 16, 0x000000, 0.25);
+    this.add.rectangle(x - 10, y + 8, 26, 7, 0x78350f).setRotation(0.4);
+    this.add.rectangle(x + 10, y + 8, 26, 7, 0x78350f).setRotation(-0.4);
+    this.add.circle(x, y, 16, 0xf97316, 0.85);
+    this.add.circle(x, y - 7, 10, 0xfacc15, 0.9);
+  }
+
   drawTree(x, y) {
     this.add.ellipse(x + 5, y + 18, 22, 10, 0x000000, 0.18);
     this.add.rectangle(x, y + 16, 9, 35, 0x78350f);
@@ -217,12 +276,21 @@ export default class WorldScene extends Phaser.Scene {
   createPlayer() {
     this.player = this.add.container(520, 545);
 
-    this.player.shadow = this.add.ellipse(0, 24, 34, 12, 0x000000, 0.22);
+    this.player.shadow = this.add.ellipse(0, 24, 38, 13, 0x000000, 0.28);
+    this.player.outline = this.add.rectangle(0, 0, 34, 44, 0x0f172a);
     this.player.bodyShape = this.add.rectangle(0, 0, 28, 38, 0x38bdf8);
+    this.player.headOutline = this.add.circle(0, -24, 17, 0x0f172a);
     this.player.head = this.add.circle(0, -24, 14, 0xfacc15);
     this.player.sword = this.add.rectangle(22, 0, 7, 32, 0xe5e7eb);
 
-    this.player.add([this.player.shadow, this.player.bodyShape, this.player.head, this.player.sword]);
+    this.player.add([
+      this.player.shadow,
+      this.player.outline,
+      this.player.bodyShape,
+      this.player.headOutline,
+      this.player.head,
+      this.player.sword,
+    ]);
 
     this.physics.add.existing(this.player);
     this.player.body.setSize(28, 38);
@@ -288,8 +356,10 @@ export default class WorldScene extends Phaser.Scene {
 
     const ally = this.add.container(x, y);
 
-    ally.shadow = this.add.ellipse(0, 22, 30, 10, 0x000000, 0.2);
+    ally.shadow = this.add.ellipse(0, 22, 34, 11, 0x000000, 0.25);
+    ally.outline = this.add.rectangle(0, 0, 34, 42, 0x0f172a);
     ally.bodyShape = this.add.rectangle(0, 0, 28, 36, color);
+    ally.headOutline = this.add.circle(0, -22, 15, 0x0f172a);
     ally.head = this.add.circle(0, -22, 12, 0xfde68a);
 
     if (type === "Archer") {
@@ -298,7 +368,7 @@ export default class WorldScene extends Phaser.Scene {
       ally.weapon = this.add.rectangle(20, 0, 8, 30, 0xcbd5e1);
     }
 
-    ally.add([ally.shadow, ally.bodyShape, ally.head, ally.weapon]);
+    ally.add([ally.shadow, ally.outline, ally.bodyShape, ally.headOutline, ally.head, ally.weapon]);
 
     this.physics.add.existing(ally);
     ally.body.setSize(28, 36);
@@ -566,9 +636,11 @@ export default class WorldScene extends Phaser.Scene {
 
     const stats = this.getEnemyStats(enemyType);
 
+    enemy.outline = this.add.rectangle(0, 0, stats.sizeW + 6, stats.sizeH + 6, 0x0f172a);
     enemy.bodyShape = this.add.rectangle(0, 0, stats.sizeW, stats.sizeH, stats.color);
+    enemy.headOutline = this.add.circle(0, -stats.sizeH / 2 - 6, stats.headSize + 3, 0x0f172a);
     enemy.head = this.add.circle(0, -stats.sizeH / 2 - 6, stats.headSize, stats.headColor);
-    enemy.add([enemy.shadow, enemy.bodyShape, enemy.head]);
+    enemy.add([enemy.shadow, enemy.outline, enemy.bodyShape, enemy.headOutline, enemy.head]);
 
     this.physics.add.existing(enemy);
     enemy.body.setSize(stats.sizeW, stats.sizeH);
@@ -685,6 +757,10 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   update(time) {
+    if (this.gameEnded) {
+      return;
+    }
+
     this.handleHotkeys(time);
 
     if (this.isPaused) {
@@ -1031,10 +1107,49 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   respawnPlayer() {
-    this.playerStats.hp = this.playerStats.maxHp;
-    this.player.x = 520;
-    this.player.y = 545;
-    this.showMessage("You fell. Respawned near castle.");
+    this.heroGameOver();
+  }
+
+  heroGameOver() {
+    if (this.gameEnded) return;
+
+    this.gameEnded = true;
+    this.isPaused = true;
+    this.physics.world.pause();
+
+    this.player.body.setVelocity(0);
+    this.playerStats.hp = 0;
+
+    this.cameras.main.shake(240, 0.01);
+
+    const overlay = this.add.rectangle(480, 270, 960, 540, 0x000000, 0.72);
+    overlay.setScrollFactor(0);
+    overlay.setDepth(10000);
+
+    const panel = this.add.rectangle(480, 270, 620, 250, 0x111827, 0.96);
+    panel.setScrollFactor(0);
+    panel.setDepth(10001);
+
+    const title = this.add.text(480, 205, "GAME OVER", {
+      fontSize: "44px",
+      color: "#ef4444",
+      fontFamily: "monospace",
+      fontStyle: "bold",
+    });
+    title.setOrigin(0.5);
+    title.setScrollFactor(0);
+    title.setDepth(10002);
+
+    const body = this.add.text(480, 285, "The hero has fallen.\nRefresh the browser to restart.\nTip: Use potions with U before HP reaches 0.", {
+      fontSize: "20px",
+      color: "#ffffff",
+      align: "center",
+      fontFamily: "monospace",
+      lineSpacing: 8,
+    });
+    body.setOrigin(0.5);
+    body.setScrollFactor(0);
+    body.setDepth(10002);
   }
 
   killEnemy(enemy) {
@@ -1615,21 +1730,30 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   gameOver() {
+    if (this.gameEnded) return;
+
+    this.gameEnded = true;
     this.isPaused = true;
     this.physics.world.pause();
 
-    const bg = this.add.rectangle(480, 270, 600, 230, 0x111827, 0.94);
-    bg.setScrollFactor(0);
-    bg.setDepth(10000);
+    const overlay = this.add.rectangle(480, 270, 960, 540, 0x000000, 0.72);
+    overlay.setScrollFactor(0);
+    overlay.setDepth(10000);
 
-    const text = this.add.text(275, 205, "GAME OVER\nCastle Destroyed\nRefresh browser to restart", {
+    const bg = this.add.rectangle(480, 270, 640, 250, 0x111827, 0.96);
+    bg.setScrollFactor(0);
+    bg.setDepth(10001);
+
+    const text = this.add.text(480, 270, "GAME OVER\nCastle Destroyed\nRefresh browser to restart", {
       fontSize: "32px",
       color: "#ef4444",
       align: "center",
       fontFamily: "monospace",
+      lineSpacing: 8,
     });
 
+    text.setOrigin(0.5);
     text.setScrollFactor(0);
-    text.setDepth(10001);
+    text.setDepth(10002);
   }
 }
