@@ -17,6 +17,9 @@ export default class WorldScene extends Phaser.Scene {
     this.maxCastleHealth = 500;
 
     this.lastPlayerAttack = 0;
+    this.attackRange = 105;
+    this.attackArcDegrees = 95;
+    this.hitFreezeUntil = 0;
     this.helpVisible = true;
     this.shopOpen = false;
     this.inventoryOpen = false;
@@ -101,6 +104,7 @@ export default class WorldScene extends Phaser.Scene {
     this.createAllies();
     this.createGroups();
     this.createInput();
+    this.createMouseAim();
     this.createCamera();
     this.createCombat();
     this.createFixedUI();
@@ -358,6 +362,19 @@ export default class WorldScene extends Phaser.Scene {
     });
   }
 
+  createMouseAim() {
+    this.input.mouse.disableContextMenu();
+
+    this.aimReticle = this.add.graphics();
+    this.aimReticle.setDepth(9998);
+
+    this.input.on("pointerdown", (pointer) => {
+      if (pointer.leftButtonDown()) {
+        this.playerAttack(this.time.now);
+      }
+    });
+  }
+
   createCamera() {
     this.cameras.main.setBounds(0, 0, this.worldW, this.worldH);
     this.cameras.main.startFollow(this.player, true, 0.09, 0.09);
@@ -382,6 +399,7 @@ export default class WorldScene extends Phaser.Scene {
 
       this.playerStats.hp -= projectile.damage;
       this.showDamage(this.player.x, this.player.y, projectile.damage, "#ef4444");
+      this.flashTarget(this.player.bodyShape, 0xef4444);
       projectile.destroy();
 
       if (this.playerStats.hp <= 0) {
@@ -691,6 +709,13 @@ export default class WorldScene extends Phaser.Scene {
       return;
     }
 
+    this.updateAimReticle();
+
+    if (time < this.hitFreezeUntil) {
+      this.player.body.setVelocity(0);
+      return;
+    }
+
     this.movePlayer();
     this.updateEnemies(time);
     this.updateAllies(time);
@@ -704,6 +729,24 @@ export default class WorldScene extends Phaser.Scene {
       this.showMessage(`Wave ${this.wave - 1} cleared. Wave ${this.wave} starts soon.`);
       this.spawnWave();
     }
+  }
+
+  updateAimReticle() {
+    if (!this.aimReticle || !this.player) return;
+
+    const pointer = this.input.activePointer;
+    const worldPoint = pointer.positionToCamera(this.cameras.main);
+
+    this.aimReticle.clear();
+
+    this.aimReticle.lineStyle(2, 0xffffff, 0.55);
+    this.aimReticle.strokeCircle(worldPoint.x, worldPoint.y, 8);
+
+    this.aimReticle.lineStyle(1, 0xffffff, 0.22);
+    this.aimReticle.lineBetween(this.player.x, this.player.y, worldPoint.x, worldPoint.y);
+
+    const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, worldPoint.x, worldPoint.y);
+    this.player.sword.rotation = angle + Math.PI / 2;
   }
 
   handleHotkeys(time) {
@@ -979,40 +1022,118 @@ export default class WorldScene extends Phaser.Scene {
     if (time - this.lastPlayerAttack < 420) return;
     this.lastPlayerAttack = time;
 
+    const pointer = this.input.activePointer;
+    const worldPoint = pointer.positionToCamera(this.cameras.main);
+
+    const attackAngle = Phaser.Math.Angle.Between(
+      this.player.x,
+      this.player.y,
+      worldPoint.x,
+      worldPoint.y
+    );
+
     let hitSomething = false;
 
     this.enemies.children.iterate((enemy) => {
       if (!enemy || !enemy.active) return;
 
       const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y);
+      if (distance > this.attackRange) return;
 
-      if (distance < 88) {
+      const enemyAngle = Phaser.Math.Angle.Between(this.player.x, this.player.y, enemy.x, enemy.y);
+      const angleDiff = Math.abs(Phaser.Math.Angle.Wrap(enemyAngle - attackAngle));
+      const arcLimit = Phaser.Math.DegToRad(this.attackArcDegrees / 2);
+
+      if (angleDiff <= arcLimit) {
         hitSomething = true;
-        enemy.hp -= this.playerStats.damage;
-        this.showDamage(enemy.x, enemy.y, this.playerStats.damage, "#ffffff");
 
-        const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, enemy.x, enemy.y);
-        enemy.x += Math.cos(angle) * 18;
-        enemy.y += Math.sin(angle) * 18;
+        const crit = Math.random() < 0.15;
+        const damage = crit ? Math.floor(this.playerStats.damage * 1.7) : this.playerStats.damage;
+
+        enemy.hp -= damage;
+
+        this.showDamage(
+          enemy.x,
+          enemy.y,
+          crit ? `CRIT ${damage}` : damage,
+          crit ? "#facc15" : "#ffffff"
+        );
+
+        this.applyKnockback(enemy, attackAngle, crit ? 55 : 32);
+        this.flashTarget(enemy.bodyShape, crit ? 0xfacc15 : 0xffffff);
+        this.hitFreezeUntil = time + (crit ? 95 : 55);
 
         if (enemy.hp <= 0) this.killEnemy(enemy);
       }
     });
 
-    const slash = this.add.arc(this.player.x, this.player.y, 78, -40, 40, false, 0xffffff, 0.35);
-    slash.setDepth(50);
-
-    this.tweens.add({
-      targets: slash,
-      alpha: 0,
-      scale: 1.25,
-      duration: 180,
-      onComplete: () => slash.destroy(),
-    });
+    this.drawSlashEffect(attackAngle, hitSomething);
 
     if (!hitSomething) {
-      this.showMessage("Swing missed. Move closer to enemies.");
+      this.showMessage("Swing missed. Aim toward enemies with mouse.");
     }
+  }
+
+  drawSlashEffect(angle, hitSomething) {
+    const arc = this.add.graphics();
+    arc.setDepth(80);
+
+    const color = hitSomething ? 0xfacc15 : 0xffffff;
+    arc.lineStyle(8, color, hitSomething ? 0.75 : 0.35);
+
+    const startAngle = angle - Phaser.Math.DegToRad(this.attackArcDegrees / 2);
+    const endAngle = angle + Phaser.Math.DegToRad(this.attackArcDegrees / 2);
+
+    arc.beginPath();
+    arc.arc(this.player.x, this.player.y, this.attackRange, startAngle, endAngle);
+    arc.strokePath();
+
+    const spark = this.add.circle(
+      this.player.x + Math.cos(angle) * 72,
+      this.player.y + Math.sin(angle) * 72,
+      8,
+      color,
+      hitSomething ? 0.9 : 0.35
+    );
+    spark.setDepth(81);
+
+    this.tweens.add({
+      targets: arc,
+      alpha: 0,
+      scaleX: 1.08,
+      scaleY: 1.08,
+      duration: 150,
+      onComplete: () => arc.destroy(),
+    });
+
+    this.tweens.add({
+      targets: spark,
+      alpha: 0,
+      scale: 2,
+      duration: 180,
+      onComplete: () => spark.destroy(),
+    });
+  }
+
+  applyKnockback(target, angle, force) {
+    target.x += Math.cos(angle) * force;
+    target.y += Math.sin(angle) * force;
+
+    target.x = Phaser.Math.Clamp(target.x, 20, this.worldW - 20);
+    target.y = Phaser.Math.Clamp(target.y, 20, this.worldH - 20);
+  }
+
+  flashTarget(target, color) {
+    if (!target || !target.setFillStyle) return;
+
+    const originalFill = target.fillColor ?? 0xffffff;
+    target.setFillStyle(color);
+
+    this.time.delayedCall(90, () => {
+      if (target.active) {
+        target.setFillStyle(originalFill);
+      }
+    });
   }
 
   damagePlayer(enemy) {
@@ -1022,6 +1143,7 @@ export default class WorldScene extends Phaser.Scene {
     enemy.lastAttack = now;
     this.playerStats.hp -= enemy.damage;
 
+    this.flashTarget(this.player.bodyShape, 0xef4444);
     this.cameras.main.shake(80, 0.004);
     this.showDamage(this.player.x, this.player.y, enemy.damage, "#ef4444");
 
@@ -1461,7 +1583,7 @@ export default class WorldScene extends Phaser.Scene {
         "KEYS",
         "WASD Move",
         "Shift Run",
-        "Space Hit",
+        "Mouse/Space Hit",
         "E Talk",
         "B Shop",
         "I Bag",
@@ -1592,7 +1714,8 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   showDamage(x, y, damage, color) {
-    this.showFloatingText(x, y - 20, `-${damage}`, color);
+    const label = typeof damage === "number" ? `-${damage}` : damage;
+    this.showFloatingText(x, y - 20, label, color);
   }
 
   showFloatingText(x, y, message, color) {
