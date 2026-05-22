@@ -1687,6 +1687,7 @@ export default class WorldScene extends Phaser.Scene {
     this.updateEnemies(time);
     this.updateAllies(time);
     this.resolveUnitOverlap();
+    this.updateUnitWalkBob(time);
     this.updateLabels();
     this.updateUI();
     this.updateMinimap();
@@ -2120,6 +2121,7 @@ export default class WorldScene extends Phaser.Scene {
       }
 
       this.drawHealPulse(ally.x, ally.y);
+      this.playUnitAttackAnimation(ally);
       this.playSound("heal");
     }
   }
@@ -2311,38 +2313,14 @@ export default class WorldScene extends Phaser.Scene {
 
 
   animateMeleeAttack(unit) {
-    if (!unit || !unit.active) return;
-
-    this.tweens.add({
-      targets: unit.weapon || unit.bodyShape,
-      angle: 35,
-      duration: 80,
-      yoyo: true,
-      ease: "Sine.easeOut",
-    });
-
-    this.tweens.add({
-      targets: unit.bodyShape,
-      scaleX: 1.14,
-      scaleY: 1.14,
-      duration: 80,
-      yoyo: true,
-    });
-
-    this.playSound("attack");
+    this.playUnitAttackAnimation(unit);
   }
+
 
   animateRangedAttack(unit) {
-    if (!unit || !unit.active) return;
-
-    this.tweens.add({
-      targets: unit.weapon || unit.bodyShape,
-      scaleX: 1.18,
-      scaleY: 1.18,
-      duration: 90,
-      yoyo: true,
-    });
+    this.playUnitAttackAnimation(unit);
   }
+
 
   animateDeath(unit, onComplete) {
     if (!unit || !unit.active) {
@@ -2377,6 +2355,7 @@ export default class WorldScene extends Phaser.Scene {
   playerAttack(time) {
     if (time - this.lastPlayerAttack < 420) return;
     this.lastPlayerAttack = time;
+    this.playUnitAttackAnimation(this.player);
 
     let hitSomething = false;
 
@@ -3388,6 +3367,314 @@ export default class WorldScene extends Phaser.Scene {
     }
   }
 
+
+  updateUnitWalkBob(time) {
+    const bobUnit = (unit, strength = 2.2, speed = 0.018) => {
+      if (!unit || !unit.active || !unit.body) return;
+
+      const moving = Math.abs(unit.body.velocity.x) > 4 || Math.abs(unit.body.velocity.y) > 4;
+
+      if (!unit.baseScaleX) {
+        unit.baseScaleX = unit.scaleX || 1;
+        unit.baseScaleY = unit.scaleY || 1;
+      }
+
+      if (moving) {
+        const bob = Math.sin(time * speed + unit.x * 0.03) * strength;
+        const squash = Math.sin(time * speed + unit.y * 0.02) * 0.025;
+
+        unit.y += bob * 0.025;
+        unit.scaleX = unit.baseScaleX + squash;
+        unit.scaleY = unit.baseScaleY - squash;
+      } else {
+        unit.scaleX += (unit.baseScaleX - unit.scaleX) * 0.18;
+        unit.scaleY += (unit.baseScaleY - unit.scaleY) * 0.18;
+      }
+    };
+
+    bobUnit(this.player, 2.5, 0.019);
+
+    if (this.allies) {
+      this.allies.children.iterate((ally) => {
+        if (!ally || !ally.active) return;
+        bobUnit(ally, ally.role === "castleArcher" ? 0.35 : 2.0, 0.018);
+      });
+    }
+
+    if (this.enemies) {
+      this.enemies.children.iterate((enemy) => {
+        if (!enemy || !enemy.active) return;
+        bobUnit(enemy, enemy.isBoss ? 1.2 : 2.1, enemy.isBoss ? 0.012 : 0.019);
+      });
+    }
+  }
+
+  playUnitAttackAnimation(unit) {
+    if (!unit || !unit.active) return;
+
+    const type = unit.type || unit.enemyType || "Unit";
+    const role = unit.role || "";
+
+    if (type === "Player Knight") {
+      this.animateSwordSlash(unit, 0xfacc15, 1.25);
+      return;
+    }
+
+    if (type === "Ally Knight" || role === "knight") {
+      this.animateSwordSlash(unit, 0x93c5fd, 1.0);
+      return;
+    }
+
+    if (type === "Ally Archer" || role === "archer") {
+      this.animateBowShot(unit, 0xfacc15);
+      return;
+    }
+
+    if (type === "Castle Archer" || role === "castleArcher") {
+      this.animateCastleArcherShot(unit);
+      return;
+    }
+
+    if (type === "Healer" || role === "healer") {
+      this.animateHealerCast(unit);
+      return;
+    }
+
+    if (type === "Goblin") {
+      this.animateGoblinStab(unit);
+      return;
+    }
+
+    if (type === "Orc Warrior") {
+      this.animateHeavySwing(unit, 0xef4444, 1.0);
+      return;
+    }
+
+    if (type === "Orc Archer") {
+      this.animateBowShot(unit, 0xef4444);
+      return;
+    }
+
+    if (type === "Armored Orc") {
+      this.animateHeavySwing(unit, 0xcbd5e1, 1.15);
+      return;
+    }
+
+    if (type === "Troll Boss") {
+      this.animateBossSmash(unit);
+      return;
+    }
+
+    this.animateBasicAttack(unit);
+  }
+
+  animateSwordSlash(unit, color = 0xffffff, size = 1) {
+    this.playSound?.("attack");
+
+    const slash = this.add.arc(unit.x + 20, unit.y, 36 * size, -45, 55, false, color, 0.55);
+    slash.setDepth(8000);
+
+    this.tweens.add({
+      targets: slash,
+      alpha: 0,
+      scaleX: 1.45,
+      scaleY: 1.45,
+      duration: 160,
+      onComplete: () => slash.destroy(),
+    });
+
+    if (unit.sword || unit.swordBlade || unit.weapon) {
+      const weapon = unit.sword || unit.swordBlade || unit.weapon;
+
+      this.tweens.add({
+        targets: weapon,
+        angle: 38,
+        x: weapon.x + 4,
+        duration: 80,
+        yoyo: true,
+      });
+    }
+
+    this.tweens.add({
+      targets: unit,
+      x: unit.x + 5,
+      duration: 70,
+      yoyo: true,
+    });
+  }
+
+  animateBowShot(unit, color = 0xfacc15) {
+    this.playSound?.("arrow");
+
+    if (unit.weapon) {
+      this.tweens.add({
+        targets: unit.weapon,
+        scaleX: 0.72,
+        scaleY: 1.18,
+        duration: 90,
+        yoyo: true,
+      });
+    }
+
+    const flash = this.add.circle(unit.x + 24, unit.y - 2, 9, color, 0.5);
+    flash.setDepth(8000);
+
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      scale: 2,
+      duration: 160,
+      onComplete: () => flash.destroy(),
+    });
+  }
+
+  animateCastleArcherShot(unit) {
+    this.playSound?.("arrow");
+
+    const flash = this.add.circle(unit.x + 25, unit.y - 10, 11, 0xfacc15, 0.55);
+    flash.setDepth(8000);
+
+    this.tweens.add({
+      targets: flash,
+      y: flash.y - 8,
+      alpha: 0,
+      scale: 2,
+      duration: 180,
+      onComplete: () => flash.destroy(),
+    });
+
+    if (unit.weapon) {
+      this.tweens.add({
+        targets: unit.weapon,
+        angle: -8,
+        duration: 80,
+        yoyo: true,
+      });
+    }
+  }
+
+  animateHealerCast(unit) {
+    this.playSound?.("heal");
+
+    const ring = this.add.circle(unit.x, unit.y, 28, 0x22c55e, 0.18);
+    ring.setDepth(8000);
+
+    this.tweens.add({
+      targets: ring,
+      scale: 2.2,
+      alpha: 0,
+      duration: 420,
+      onComplete: () => ring.destroy(),
+    });
+
+    if (unit.glow || unit.staffTop) {
+      this.tweens.add({
+        targets: [unit.glow, unit.staffTop].filter(Boolean),
+        scale: 1.35,
+        duration: 140,
+        yoyo: true,
+      });
+    }
+  }
+
+  animateGoblinStab(unit) {
+    this.playSound?.("attack");
+
+    if (unit.weapon) {
+      this.tweens.add({
+        targets: unit.weapon,
+        x: unit.weapon.x + 8,
+        duration: 65,
+        yoyo: true,
+      });
+    }
+
+    this.tweens.add({
+      targets: unit,
+      x: unit.x + 4,
+      duration: 60,
+      yoyo: true,
+    });
+  }
+
+  animateHeavySwing(unit, color = 0xef4444, size = 1) {
+    this.playSound?.("attack");
+
+    const smash = this.add.arc(unit.x + 25, unit.y + 2, 42 * size, -65, 70, false, color, 0.45);
+    smash.setDepth(8000);
+
+    this.tweens.add({
+      targets: smash,
+      alpha: 0,
+      scale: 1.6,
+      duration: 210,
+      onComplete: () => smash.destroy(),
+    });
+
+    if (unit.weapon || unit.weaponHead) {
+      this.tweens.add({
+        targets: [unit.weapon, unit.weaponHead].filter(Boolean),
+        angle: 42,
+        duration: 110,
+        yoyo: true,
+      });
+    }
+
+    this.tweens.add({
+      targets: unit,
+      scaleX: unit.scaleX * 1.08,
+      scaleY: unit.scaleY * 0.95,
+      duration: 90,
+      yoyo: true,
+    });
+  }
+
+  animateBossSmash(unit) {
+    this.playSound?.("boss");
+
+    const warning = this.add.circle(unit.x + 35, unit.y + 15, 55, 0xef4444, 0.18);
+    warning.setDepth(8000);
+
+    const shock = this.add.circle(unit.x + 35, unit.y + 15, 18, 0xfacc15, 0.28);
+    shock.setDepth(8001);
+
+    this.tweens.add({
+      targets: warning,
+      alpha: 0,
+      scale: 1.8,
+      duration: 350,
+      onComplete: () => warning.destroy(),
+    });
+
+    this.tweens.add({
+      targets: shock,
+      alpha: 0,
+      scale: 3,
+      duration: 250,
+      onComplete: () => shock.destroy(),
+    });
+
+    if (unit.club || unit.clubHead || unit.weapon) {
+      this.tweens.add({
+        targets: [unit.club, unit.clubHead, unit.weapon].filter(Boolean),
+        angle: 55,
+        duration: 130,
+        yoyo: true,
+      });
+    }
+
+    this.cameras.main.shake(70, 0.003);
+  }
+
+  animateBasicAttack(unit) {
+    this.tweens.add({
+      targets: unit,
+      scaleX: unit.scaleX * 1.08,
+      scaleY: unit.scaleY * 1.08,
+      duration: 80,
+      yoyo: true,
+    });
+  }
 
   updateLabels() {
     this.playerLabel.x = this.player.x - 22;
