@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 
-const SAVE_KEY = "kingdom-frontier-2d-save-v03";
+const SAVE_KEY = "kingdom-frontier-2d-save-v04";
 
 export default class WorldScene extends Phaser.Scene {
   constructor() {
@@ -15,10 +15,14 @@ export default class WorldScene extends Phaser.Scene {
     this.waveCooldown = false;
     this.castleHealth = 500;
     this.maxCastleHealth = 500;
+
     this.lastPlayerAttack = 0;
     this.helpVisible = true;
     this.shopOpen = false;
     this.inventoryOpen = false;
+    this.questOpen = false;
+    this.isPaused = false;
+    this.lastSavedText = "Never";
 
     this.playerStats = {
       hp: 100,
@@ -32,20 +36,77 @@ export default class WorldScene extends Phaser.Scene {
       potions: 2,
       swordLevel: 1,
       kills: 0,
+      bossKills: 0,
+      loot: {
+        goblinCoin: 0,
+        wolfFur: 0,
+        orcTooth: 0,
+        trollBone: 0,
+        magicCrystal: 0,
+      },
     };
+
+    this.quests = [
+      {
+        id: "kill5",
+        title: "Kill 5 enemies",
+        target: 5,
+        progress: 0,
+        done: false,
+        rewardGold: 40,
+        rewardXp: 40,
+      },
+      {
+        id: "survive3",
+        title: "Reach Wave 3",
+        target: 3,
+        progress: 1,
+        done: false,
+        rewardGold: 70,
+        rewardXp: 60,
+      },
+      {
+        id: "repair1",
+        title: "Repair castle once",
+        target: 1,
+        progress: 0,
+        done: false,
+        rewardGold: 50,
+        rewardXp: 40,
+      },
+      {
+        id: "upgrade1",
+        title: "Upgrade sword once",
+        target: 1,
+        progress: 0,
+        done: false,
+        rewardGold: 30,
+        rewardXp: 40,
+      },
+      {
+        id: "boss1",
+        title: "Defeat 1 boss",
+        target: 1,
+        progress: 0,
+        done: false,
+        rewardGold: 150,
+        rewardXp: 120,
+      },
+    ];
 
     this.createWorld();
     this.createCastle();
     this.createPlayer();
     this.createNPCs();
     this.createAllies();
-    this.createEnemies();
+    this.createGroups();
     this.createInput();
     this.createCamera();
     this.createCombat();
     this.createFixedUI();
+    this.spawnWave();
 
-    this.showMessage("Game ready. Press H for keys. Press P to save, L to load.");
+    this.showMessage("V04 loaded. Shop and repair now require correct location. Press H for keys.");
   }
 
   createWorld() {
@@ -53,7 +114,7 @@ export default class WorldScene extends Phaser.Scene {
 
     this.add.rectangle(this.worldW / 2, this.worldH / 2, this.worldW, this.worldH, 0x3f7d20);
 
-    for (let i = 0; i < 120; i++) {
+    for (let i = 0; i < 130; i++) {
       const x = Phaser.Math.Between(30, this.worldW - 30);
       const y = Phaser.Math.Between(30, this.worldH - 30);
       const color = Phaser.Math.RND.pick([0x4d8f27, 0x34701d, 0x5a9b32, 0x2f6b1c]);
@@ -89,11 +150,11 @@ export default class WorldScene extends Phaser.Scene {
 
     this.add.rectangle(150, 530, 280, 460, 0x64748b, 0.35);
 
-    for (let i = 0; i < 80; i++) {
+    for (let i = 0; i < 85; i++) {
       this.drawTree(Phaser.Math.Between(1050, 1740), Phaser.Math.Between(130, 1040));
     }
 
-    for (let i = 0; i < 34; i++) {
+    for (let i = 0; i < 36; i++) {
       this.drawRock(Phaser.Math.Between(700, 1650), Phaser.Math.Between(260, 1000));
     }
 
@@ -126,11 +187,20 @@ export default class WorldScene extends Phaser.Scene {
     this.castle = this.add.rectangle(120, 520, 170, 420, 0x94a3b8);
     this.physics.add.existing(this.castle, true);
 
+    this.castleGatePoint = { x: 230, y: 520 };
+
     this.add.rectangle(120, 315, 190, 45, 0xcbd5e1);
     this.add.rectangle(60, 290, 45, 70, 0xcbd5e1);
     this.add.rectangle(180, 290, 45, 70, 0xcbd5e1);
     this.add.rectangle(205, 520, 32, 130, 0x78350f);
     this.add.rectangle(205, 520, 10, 100, 0x451a03);
+
+    this.add.circle(this.castleGatePoint.x, this.castleGatePoint.y, 9, 0xfacc15, 0.85);
+    this.add.text(this.castleGatePoint.x - 55, this.castleGatePoint.y + 74, "Repair point", {
+      fontSize: "12px",
+      color: "#ffffff",
+      fontFamily: "monospace",
+    });
 
     for (let i = 0; i < 6; i++) {
       this.add.rectangle(45 + i * 30, 310, 18, 30, 0x475569);
@@ -173,21 +243,21 @@ export default class WorldScene extends Phaser.Scene {
         x: 260,
         y: 480,
         color: 0xfacc15,
-        dialogue: "King: Defend the castle. Save often with P.",
+        dialogue: "King: Defend the castle. Check quests with Q.",
       },
       {
         name: "Merchant",
         x: 330,
         y: 845,
         color: 0x22c55e,
-        dialogue: "Merchant: Press B. Buy potion with 1, repair castle with 3.",
+        dialogue: "Merchant: Stand near me and press B for shop.",
       },
       {
         name: "Blacksmith",
         x: 500,
         y: 845,
         color: 0xf97316,
-        dialogue: "Blacksmith: Press B, then 2 to upgrade sword for 60 gold.",
+        dialogue: "Blacksmith: Stand near me and press B to upgrade sword.",
       },
     ];
 
@@ -255,96 +325,11 @@ export default class WorldScene extends Phaser.Scene {
     this.allies.add(ally);
   }
 
-  createEnemies() {
+  createGroups() {
     this.enemies = this.physics.add.group();
-    this.spawnWave();
-  }
-
-  spawnWave() {
-    this.waveCooldown = true;
-
-    this.time.delayedCall(900, () => {
-      const count = 5 + this.wave * 2;
-
-      for (let i = 0; i < count; i++) {
-        const spawnSide = Phaser.Math.RND.pick(["right", "bottom", "top"]);
-        let x;
-        let y;
-
-        if (spawnSide === "right") {
-          x = Phaser.Math.Between(1450, 1740);
-          y = Phaser.Math.Between(230, 950);
-        } else if (spawnSide === "bottom") {
-          x = Phaser.Math.Between(700, 1600);
-          y = Phaser.Math.Between(930, 1040);
-        } else {
-          x = Phaser.Math.Between(900, 1650);
-          y = Phaser.Math.Between(100, 200);
-        }
-
-        this.spawnEnemy(x, y);
-      }
-
-      this.waveCooldown = false;
-      this.showMessage(`Wave ${this.wave} started. Enemies incoming.`);
-    });
-  }
-
-  spawnEnemy(x, y) {
-    const enemyType = Phaser.Math.RND.pick(["Goblin", "Orc", "Wolf"]);
-
-    const enemy = this.add.container(x, y);
-    enemy.shadow = this.add.ellipse(0, 23, 30, 10, 0x000000, 0.24);
-
-    let color = 0xef4444;
-    let hp = 90 + this.wave * 15;
-    let speed = 28 + this.wave * 2;
-    let damage = 8 + this.wave;
-
-    if (enemyType === "Goblin") {
-      color = 0x84cc16;
-      hp = 70 + this.wave * 12;
-      speed = 45 + this.wave * 2;
-      damage = 6 + this.wave;
-    }
-
-    if (enemyType === "Orc") {
-      color = 0xef4444;
-      hp = 110 + this.wave * 18;
-      speed = 26 + this.wave * 2;
-      damage = 10 + this.wave;
-    }
-
-    if (enemyType === "Wolf") {
-      color = 0x64748b;
-      hp = 65 + this.wave * 10;
-      speed = 58 + this.wave * 2;
-      damage = 7 + this.wave;
-    }
-
-    enemy.bodyShape = this.add.rectangle(0, 0, 30, 34, color);
-    enemy.head = this.add.circle(0, -22, 12, 0x7f1d1d);
-    enemy.add([enemy.shadow, enemy.bodyShape, enemy.head]);
-
-    this.physics.add.existing(enemy);
-    enemy.body.setSize(30, 34);
-    enemy.body.setOffset(-15, -17);
-
-    enemy.enemyType = enemyType;
-    enemy.hp = hp;
-    enemy.maxHp = hp;
-    enemy.speed = speed;
-    enemy.damage = damage;
-    enemy.gold = enemyType === "Orc" ? 8 : 5;
-    enemy.lastAttack = 0;
-    enemy.nextWander = 0;
-    enemy.wanderX = 0;
-    enemy.wanderY = 0;
-
-    enemy.hpBack = this.add.rectangle(enemy.x, enemy.y - 42, 36, 6, 0x111827);
-    enemy.hpBar = this.add.rectangle(enemy.x, enemy.y - 42, 34, 4, 0x22c55e);
-
-    this.enemies.add(enemy);
+    this.projectiles = this.physics.add.group();
+    this.enemyProjectiles = this.physics.add.group();
+    this.lootDrops = this.physics.add.group();
   }
 
   createInput() {
@@ -365,6 +350,8 @@ export default class WorldScene extends Phaser.Scene {
       P: Phaser.Input.Keyboard.KeyCodes.P,
       L: Phaser.Input.Keyboard.KeyCodes.L,
       H: Phaser.Input.Keyboard.KeyCodes.H,
+      Q: Phaser.Input.Keyboard.KeyCodes.Q,
+      ESC: Phaser.Input.Keyboard.KeyCodes.ESC,
       ONE: Phaser.Input.Keyboard.KeyCodes.ONE,
       TWO: Phaser.Input.Keyboard.KeyCodes.TWO,
       THREE: Phaser.Input.Keyboard.KeyCodes.THREE,
@@ -378,8 +365,6 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   createCombat() {
-    this.projectiles = this.physics.add.group();
-
     this.physics.add.overlap(this.projectiles, this.enemies, (projectile, enemy) => {
       if (!projectile.active || !enemy.active) return;
 
@@ -392,9 +377,25 @@ export default class WorldScene extends Phaser.Scene {
       }
     });
 
+    this.physics.add.overlap(this.enemyProjectiles, this.player, (player, projectile) => {
+      if (!projectile.active) return;
+
+      this.playerStats.hp -= projectile.damage;
+      this.showDamage(this.player.x, this.player.y, projectile.damage, "#ef4444");
+      projectile.destroy();
+
+      if (this.playerStats.hp <= 0) {
+        this.respawnPlayer();
+      }
+    });
+
     this.physics.add.overlap(this.player, this.enemies, (player, enemy) => {
       if (!enemy.active) return;
       this.damagePlayer(enemy);
+    });
+
+    this.physics.add.overlap(this.player, this.lootDrops, (player, loot) => {
+      this.collectLoot(loot);
     });
   }
 
@@ -415,6 +416,14 @@ export default class WorldScene extends Phaser.Scene {
       padding: { x: 8, y: 4 },
     });
 
+    this.saveInfoText = this.add.text(20, 84, "", {
+      fontSize: "13px",
+      color: "#cbd5e1",
+      fontFamily: "monospace",
+      backgroundColor: "#111827",
+      padding: { x: 8, y: 4 },
+    });
+
     this.messageText = this.add.text(170, 485, "", {
       fontSize: "15px",
       color: "#ffffff",
@@ -424,16 +433,16 @@ export default class WorldScene extends Phaser.Scene {
       wordWrap: { width: 660 },
     });
 
-    this.helpPanel = this.add.text(690, 16, "", {
-      fontSize: "12px",
+    this.helpPanel = this.add.text(785, 16, "", {
+      fontSize: "10px",
       color: "#e5e7eb",
       fontFamily: "monospace",
       backgroundColor: "#020617",
-      padding: { x: 10, y: 8 },
-      lineSpacing: 4,
+      padding: { x: 8, y: 6 },
+      lineSpacing: 2,
     });
 
-    this.shopPanel = this.add.text(20, 90, "", {
+    this.shopPanel = this.add.text(20, 120, "", {
       fontSize: "13px",
       color: "#ffffff",
       fontFamily: "monospace",
@@ -442,7 +451,7 @@ export default class WorldScene extends Phaser.Scene {
       lineSpacing: 5,
     });
 
-    this.inventoryPanel = this.add.text(20, 230, "", {
+    this.inventoryPanel = this.add.text(20, 250, "", {
       fontSize: "13px",
       color: "#ffffff",
       fontFamily: "monospace",
@@ -450,46 +459,285 @@ export default class WorldScene extends Phaser.Scene {
       padding: { x: 10, y: 8 },
       lineSpacing: 5,
     });
+
+    this.questPanel = this.add.text(360, 100, "", {
+      fontSize: "13px",
+      color: "#ffffff",
+      fontFamily: "monospace",
+      backgroundColor: "#111827",
+      padding: { x: 12, y: 10 },
+      lineSpacing: 5,
+    });
+
+    this.pausePanel = this.add.text(330, 170, "", {
+      fontSize: "24px",
+      color: "#ffffff",
+      fontFamily: "monospace",
+      backgroundColor: "#020617",
+      padding: { x: 24, y: 18 },
+      align: "center",
+      lineSpacing: 8,
+    });
+
+    this.minimap = this.add.graphics();
 
     for (const item of [
       this.goldText,
       this.castleHpText,
+      this.saveInfoText,
       this.messageText,
       this.helpPanel,
       this.shopPanel,
       this.inventoryPanel,
+      this.questPanel,
+      this.pausePanel,
+      this.minimap,
     ]) {
       item.setScrollFactor(0);
       item.setDepth(9999);
     }
 
+    this.shopPanel.setVisible(false);
+    this.inventoryPanel.setVisible(false);
+    this.questPanel.setVisible(false);
+    this.pausePanel.setVisible(false);
+
     this.updateHelpPanel();
     this.updatePanels();
+    this.updatePausePanel();
+  }
+
+  spawnWave() {
+    this.waveCooldown = true;
+
+    this.time.delayedCall(900, () => {
+      const isBossWave = this.wave % 5 === 0;
+      const count = isBossWave ? 8 + this.wave : 5 + this.wave * 2;
+
+      for (let i = 0; i < count; i++) {
+        const { x, y } = this.getSpawnPoint();
+        this.spawnEnemy(x, y, false);
+      }
+
+      if (isBossWave) {
+        const bossSpawn = this.getSpawnPoint();
+        this.spawnEnemy(bossSpawn.x, bossSpawn.y, true);
+        this.showMessage(`Boss wave ${this.wave}. Boss Orc has appeared.`);
+      } else {
+        this.showMessage(`Wave ${this.wave} started.`);
+      }
+
+      this.waveCooldown = false;
+    });
+  }
+
+  getSpawnPoint() {
+    const spawnSide = Phaser.Math.RND.pick(["right", "bottom", "top"]);
+
+    if (spawnSide === "right") {
+      return {
+        x: Phaser.Math.Between(1450, 1740),
+        y: Phaser.Math.Between(230, 950),
+      };
+    }
+
+    if (spawnSide === "bottom") {
+      return {
+        x: Phaser.Math.Between(700, 1600),
+        y: Phaser.Math.Between(930, 1040),
+      };
+    }
+
+    return {
+      x: Phaser.Math.Between(900, 1650),
+      y: Phaser.Math.Between(100, 200),
+    };
+  }
+
+  spawnEnemy(x, y, isBoss = false) {
+    const availableTypes = this.wave >= 4
+      ? ["Goblin", "Orc", "Wolf", "Troll", "Skeleton Archer", "Dark Mage"]
+      : ["Goblin", "Orc", "Wolf"];
+
+    const enemyType = isBoss ? "Boss Orc" : Phaser.Math.RND.pick(availableTypes);
+
+    const enemy = this.add.container(x, y);
+    enemy.shadow = this.add.ellipse(0, 23, 30, 10, 0x000000, 0.24);
+
+    const stats = this.getEnemyStats(enemyType);
+
+    enemy.bodyShape = this.add.rectangle(0, 0, stats.sizeW, stats.sizeH, stats.color);
+    enemy.head = this.add.circle(0, -stats.sizeH / 2 - 6, stats.headSize, stats.headColor);
+    enemy.add([enemy.shadow, enemy.bodyShape, enemy.head]);
+
+    this.physics.add.existing(enemy);
+    enemy.body.setSize(stats.sizeW, stats.sizeH);
+    enemy.body.setOffset(-stats.sizeW / 2, -stats.sizeH / 2);
+
+    enemy.enemyType = enemyType;
+    enemy.hp = stats.hp;
+    enemy.maxHp = stats.hp;
+    enemy.speed = stats.speed;
+    enemy.damage = stats.damage;
+    enemy.gold = stats.gold;
+    enemy.isRanged = stats.isRanged;
+    enemy.isBoss = isBoss;
+    enemy.lastAttack = 0;
+    enemy.nextWander = 0;
+    enemy.wanderX = 0;
+    enemy.wanderY = 0;
+
+    enemy.hpBack = this.add.rectangle(enemy.x, enemy.y - 48, 46, 6, 0x111827);
+    enemy.hpBar = this.add.rectangle(enemy.x, enemy.y - 48, 44, 4, isBoss ? 0xfacc15 : 0x22c55e);
+
+    this.enemies.add(enemy);
+  }
+
+  getEnemyStats(type) {
+    const base = {
+      Goblin: {
+        color: 0x84cc16,
+        headColor: 0x365314,
+        hp: 70 + this.wave * 12,
+        speed: 45 + this.wave * 2,
+        damage: 6 + this.wave,
+        gold: 5,
+        sizeW: 30,
+        sizeH: 34,
+        headSize: 12,
+        isRanged: false,
+      },
+      Orc: {
+        color: 0xef4444,
+        headColor: 0x7f1d1d,
+        hp: 110 + this.wave * 18,
+        speed: 26 + this.wave * 2,
+        damage: 10 + this.wave,
+        gold: 8,
+        sizeW: 32,
+        sizeH: 38,
+        headSize: 13,
+        isRanged: false,
+      },
+      Wolf: {
+        color: 0x64748b,
+        headColor: 0x334155,
+        hp: 65 + this.wave * 10,
+        speed: 58 + this.wave * 2,
+        damage: 7 + this.wave,
+        gold: 6,
+        sizeW: 38,
+        sizeH: 24,
+        headSize: 10,
+        isRanged: false,
+      },
+      Troll: {
+        color: 0x166534,
+        headColor: 0x052e16,
+        hp: 220 + this.wave * 28,
+        speed: 18 + this.wave,
+        damage: 18 + this.wave,
+        gold: 16,
+        sizeW: 44,
+        sizeH: 54,
+        headSize: 17,
+        isRanged: false,
+      },
+      "Skeleton Archer": {
+        color: 0xe5e7eb,
+        headColor: 0xf8fafc,
+        hp: 80 + this.wave * 12,
+        speed: 28 + this.wave,
+        damage: 10 + this.wave,
+        gold: 12,
+        sizeW: 28,
+        sizeH: 36,
+        headSize: 12,
+        isRanged: true,
+      },
+      "Dark Mage": {
+        color: 0x7c3aed,
+        headColor: 0x312e81,
+        hp: 95 + this.wave * 14,
+        speed: 24 + this.wave,
+        damage: 14 + this.wave,
+        gold: 18,
+        sizeW: 30,
+        sizeH: 38,
+        headSize: 13,
+        isRanged: true,
+      },
+      "Boss Orc": {
+        color: 0xb91c1c,
+        headColor: 0x450a0a,
+        hp: 650 + this.wave * 80,
+        speed: 20 + this.wave,
+        damage: 28 + this.wave * 2,
+        gold: 120,
+        sizeW: 64,
+        sizeH: 76,
+        headSize: 24,
+        isRanged: false,
+      },
+    };
+
+    return base[type];
   }
 
   update(time) {
+    this.handleHotkeys(time);
+
+    if (this.isPaused) {
+      return;
+    }
+
     this.movePlayer();
     this.updateEnemies(time);
     this.updateAllies(time);
     this.updateLabels();
     this.updateUI();
-
-    this.handleHotkeys(time);
+    this.updateMinimap();
 
     if (!this.waveCooldown && this.enemies.countActive(true) === 0) {
       this.wave += 1;
+      this.updateQuestProgress("survive3", this.wave);
       this.showMessage(`Wave ${this.wave - 1} cleared. Wave ${this.wave} starts soon.`);
       this.spawnWave();
     }
   }
 
   handleHotkeys(time) {
+    if (Phaser.Input.Keyboard.JustDown(this.keys.ESC)) {
+      this.togglePause();
+      return;
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.keys.H)) {
+      this.helpVisible = !this.helpVisible;
+      this.updateHelpPanel();
+    }
+
+    if (this.isPaused) {
+      if (Phaser.Input.Keyboard.JustDown(this.keys.P)) this.saveGame();
+      if (Phaser.Input.Keyboard.JustDown(this.keys.L)) this.loadGame();
+      return;
+    }
+
     if (Phaser.Input.Keyboard.JustDown(this.keys.SPACE)) this.playerAttack(time);
     if (Phaser.Input.Keyboard.JustDown(this.keys.E)) this.talkToNPC();
+    if (Phaser.Input.Keyboard.JustDown(this.keys.U)) this.usePotion();
+    if (Phaser.Input.Keyboard.JustDown(this.keys.R)) this.repairCastle();
+    if (Phaser.Input.Keyboard.JustDown(this.keys.P)) this.saveGame();
+    if (Phaser.Input.Keyboard.JustDown(this.keys.L)) this.loadGame();
+
+    if (Phaser.Input.Keyboard.JustDown(this.keys.Q)) {
+      this.questOpen = !this.questOpen;
+      this.updatePanels();
+    }
 
     if (Phaser.Input.Keyboard.JustDown(this.keys.B)) {
       if (!this.shopOpen && !this.isNearShopNPC()) {
-        this.showMessage("You must stand near the Merchant or Blacksmith to open the shop.");
+        this.showMessage("Stand near Merchant or Blacksmith to open shop.");
         return;
       }
 
@@ -500,23 +748,26 @@ export default class WorldScene extends Phaser.Scene {
 
     if (Phaser.Input.Keyboard.JustDown(this.keys.I)) {
       this.inventoryOpen = !this.inventoryOpen;
-      this.showMessage(this.inventoryOpen ? "Inventory opened." : "Inventory closed.");
       this.updatePanels();
-    }
-
-    if (Phaser.Input.Keyboard.JustDown(this.keys.U)) this.usePotion();
-    if (Phaser.Input.Keyboard.JustDown(this.keys.R)) this.repairCastle();
-    if (Phaser.Input.Keyboard.JustDown(this.keys.P)) this.saveGame();
-    if (Phaser.Input.Keyboard.JustDown(this.keys.L)) this.loadGame();
-
-    if (Phaser.Input.Keyboard.JustDown(this.keys.H)) {
-      this.helpVisible = !this.helpVisible;
-      this.updateHelpPanel();
     }
 
     if (this.shopOpen && Phaser.Input.Keyboard.JustDown(this.keys.ONE)) this.buyPotion();
     if (this.shopOpen && Phaser.Input.Keyboard.JustDown(this.keys.TWO)) this.upgradeSword();
     if (this.shopOpen && Phaser.Input.Keyboard.JustDown(this.keys.THREE)) this.repairCastle();
+  }
+
+  togglePause() {
+    this.isPaused = !this.isPaused;
+
+    if (this.isPaused) {
+      this.physics.world.pause();
+      this.showMessage("Paused. Press ESC to resume. P save, L load.");
+    } else {
+      this.physics.world.resume();
+      this.showMessage("Resumed.");
+    }
+
+    this.updatePausePanel();
   }
 
   movePlayer() {
@@ -561,22 +812,48 @@ export default class WorldScene extends Phaser.Scene {
         }
       }
 
-      if (time > enemy.nextWander) {
-        enemy.nextWander = time + Phaser.Math.Between(700, 1400);
-        enemy.wanderX = Phaser.Math.Between(-70, 70);
-        enemy.wanderY = Phaser.Math.Between(-70, 70);
+      if (enemy.isRanged) {
+        this.updateRangedEnemy(enemy, targetX, targetY, time);
+      } else {
+        this.updateMeleeEnemy(enemy, targetX, targetY, time);
       }
-
-      this.physics.moveTo(enemy, targetX + enemy.wanderX, targetY + enemy.wanderY, enemy.speed);
 
       if (castleDist < 115) {
         enemy.body.setVelocity(0);
-        this.castleHealth -= 0.09;
+        this.castleHealth -= enemy.isBoss ? 0.22 : 0.09;
         if (this.castleHealth <= 0) this.gameOver();
       }
 
       this.updateEnemyHealthBar(enemy);
     });
+  }
+
+  updateMeleeEnemy(enemy, targetX, targetY, time) {
+    if (time > enemy.nextWander) {
+      enemy.nextWander = time + Phaser.Math.Between(700, 1400);
+      enemy.wanderX = Phaser.Math.Between(-70, 70);
+      enemy.wanderY = Phaser.Math.Between(-70, 70);
+    }
+
+    this.physics.moveTo(enemy, targetX + enemy.wanderX, targetY + enemy.wanderY, enemy.speed);
+  }
+
+  updateRangedEnemy(enemy, targetX, targetY, time) {
+    const dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, targetX, targetY);
+
+    if (dist > 280) {
+      this.physics.moveTo(enemy, targetX, targetY, enemy.speed);
+    } else if (dist < 180) {
+      const angle = Phaser.Math.Angle.Between(targetX, targetY, enemy.x, enemy.y);
+      this.physics.moveTo(enemy, enemy.x + Math.cos(angle) * 80, enemy.y + Math.sin(angle) * 80, enemy.speed);
+    } else {
+      enemy.body.setVelocity(0);
+    }
+
+    if (dist < 340 && time - enemy.lastAttack > 1700) {
+      enemy.lastAttack = time;
+      this.shootEnemyProjectile(enemy, targetX, targetY);
+    }
   }
 
   updateAllies(time) {
@@ -613,9 +890,7 @@ export default class WorldScene extends Phaser.Scene {
         } else {
           if (distance < 170) {
             const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, ally.x, ally.y);
-            const fleeX = ally.x + Math.cos(angle) * 80;
-            const fleeY = ally.y + Math.sin(angle) * 80;
-            this.physics.moveTo(ally, fleeX, fleeY, ally.speed);
+            this.physics.moveTo(ally, ally.x + Math.cos(angle) * 80, ally.y + Math.sin(angle) * 80, ally.speed);
           } else if (distance > 280) {
             this.physics.moveTo(ally, enemy.x, enemy.y, ally.speed * 0.55);
           } else {
@@ -686,6 +961,20 @@ export default class WorldScene extends Phaser.Scene {
     });
   }
 
+  shootEnemyProjectile(enemy, targetX, targetY) {
+    const color = enemy.enemyType === "Dark Mage" ? 0xa78bfa : 0xe5e7eb;
+    const projectile = this.add.circle(enemy.x, enemy.y, 6, color);
+    this.physics.add.existing(projectile);
+
+    projectile.damage = enemy.damage;
+    this.enemyProjectiles.add(projectile);
+    this.physics.moveTo(projectile, targetX, targetY, 320);
+
+    this.time.delayedCall(1500, () => {
+      if (projectile.active) projectile.destroy();
+    });
+  }
+
   playerAttack(time) {
     if (time - this.lastPlayerAttack < 420) return;
     this.lastPlayerAttack = time;
@@ -737,11 +1026,15 @@ export default class WorldScene extends Phaser.Scene {
     this.showDamage(this.player.x, this.player.y, enemy.damage, "#ef4444");
 
     if (this.playerStats.hp <= 0) {
-      this.playerStats.hp = this.playerStats.maxHp;
-      this.player.x = 520;
-      this.player.y = 545;
-      this.showMessage("You fell. Respawned near castle.");
+      this.respawnPlayer();
     }
+  }
+
+  respawnPlayer() {
+    this.playerStats.hp = this.playerStats.maxHp;
+    this.player.x = 520;
+    this.player.y = 545;
+    this.showMessage("You fell. Respawned near castle.");
   }
 
   killEnemy(enemy) {
@@ -749,13 +1042,22 @@ export default class WorldScene extends Phaser.Scene {
     this.playerStats.xp += 10;
     this.playerStats.kills += 1;
 
+    this.updateQuestProgress("kill5", this.playerStats.kills);
+
+    if (enemy.isBoss) {
+      this.playerStats.bossKills += 1;
+      this.updateQuestProgress("boss1", this.playerStats.bossKills);
+    }
+
+    this.dropLoot(enemy);
+
     if (this.playerStats.xp >= this.playerStats.level * 80) {
       this.playerStats.xp = 0;
       this.playerStats.level += 1;
       this.playerStats.maxHp += 10;
       this.playerStats.hp = this.playerStats.maxHp;
       this.playerStats.damage += 4;
-      this.showMessage(`Level up! You are now level ${this.playerStats.level}.`);
+      this.showMessage(`Level up. You are now level ${this.playerStats.level}.`);
     }
 
     this.showFloatingText(enemy.x, enemy.y - 35, `+${enemy.gold} gold`, "#facc15");
@@ -774,6 +1076,67 @@ export default class WorldScene extends Phaser.Scene {
     });
 
     enemy.destroy();
+  }
+
+  dropLoot(enemy) {
+    const lootTable = {
+      Goblin: ["goblinCoin"],
+      Orc: ["orcTooth"],
+      Wolf: ["wolfFur"],
+      Troll: ["trollBone"],
+      "Skeleton Archer": ["goblinCoin", "magicCrystal"],
+      "Dark Mage": ["magicCrystal"],
+      "Boss Orc": ["orcTooth", "trollBone", "magicCrystal"],
+    };
+
+    const possible = lootTable[enemy.enemyType] ?? ["goblinCoin"];
+    const count = enemy.isBoss ? 3 : 1;
+
+    for (let i = 0; i < count; i++) {
+      if (!enemy.isBoss && Math.random() > 0.72) continue;
+
+      const type = Phaser.Math.RND.pick(possible);
+      const x = enemy.x + Phaser.Math.Between(-20, 20);
+      const y = enemy.y + Phaser.Math.Between(-20, 20);
+
+      const color = type === "magicCrystal" ? 0xa78bfa : type === "wolfFur" ? 0xcbd5e1 : 0xfacc15;
+      const loot = this.add.circle(x, y, 9, color);
+      this.physics.add.existing(loot);
+
+      loot.lootType = type;
+      loot.label = this.add.text(x - 18, y - 25, this.shortLootName(type), {
+        fontSize: "10px",
+        color: "#ffffff",
+        fontFamily: "monospace",
+      });
+
+      this.lootDrops.add(loot);
+    }
+  }
+
+  collectLoot(loot) {
+    if (!loot.active) return;
+
+    const type = loot.lootType;
+    this.playerStats.loot[type] = (this.playerStats.loot[type] ?? 0) + 1;
+
+    this.showFloatingText(loot.x, loot.y - 10, `Picked ${this.shortLootName(type)}`, "#facc15");
+
+    if (loot.label) loot.label.destroy();
+    loot.destroy();
+    this.updatePanels();
+  }
+
+  shortLootName(type) {
+    const names = {
+      goblinCoin: "Coin",
+      wolfFur: "Fur",
+      orcTooth: "Tooth",
+      trollBone: "Bone",
+      magicCrystal: "Crystal",
+    };
+
+    return names[type] ?? type;
   }
 
   talkToNPC() {
@@ -799,23 +1162,32 @@ export default class WorldScene extends Phaser.Scene {
   isNearShopNPC() {
     return this.npcs.some((npc) => {
       const isShopNPC = npc.name === "Merchant" || npc.name === "Blacksmith";
+      if (!isShopNPC) return false;
 
-      if (!isShopNPC) {
-        return false;
-      }
-
-      const distance = Phaser.Math.Distance.Between(
-        this.player.x,
-        this.player.y,
-        npc.x,
-        npc.y
-      );
-
+      const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, npc.x, npc.y);
       return distance < 120;
     });
   }
 
+  isNearCastleGate() {
+    const distance = Phaser.Math.Distance.Between(
+      this.player.x,
+      this.player.y,
+      this.castleGatePoint.x,
+      this.castleGatePoint.y
+    );
+
+    return distance < 145;
+  }
+
   buyPotion() {
+    if (!this.isNearShopNPC()) {
+      this.showMessage("You moved away from the shop NPC.");
+      this.shopOpen = false;
+      this.updatePanels();
+      return;
+    }
+
     if (this.playerStats.gold < 20) {
       this.showMessage("Not enough gold. Potion costs 20.");
       return;
@@ -828,6 +1200,13 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   upgradeSword() {
+    if (!this.isNearShopNPC()) {
+      this.showMessage("You moved away from the shop NPC.");
+      this.shopOpen = false;
+      this.updatePanels();
+      return;
+    }
+
     const cost = 60 + this.playerStats.swordLevel * 25;
 
     if (this.playerStats.gold < cost) {
@@ -840,6 +1219,7 @@ export default class WorldScene extends Phaser.Scene {
     this.playerStats.damage += 8;
     this.player.sword.setFillStyle(0xfacc15);
 
+    this.updateQuestProgress("upgrade1", 1);
     this.showMessage(`Sword upgraded to level ${this.playerStats.swordLevel}.`);
     this.updatePanels();
   }
@@ -862,6 +1242,11 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   repairCastle() {
+    if (!this.isNearCastleGate()) {
+      this.showMessage("Stand near the castle gate repair point to repair.");
+      return;
+    }
+
     if (this.castleHealth >= this.maxCastleHealth) {
       this.showMessage("Castle is already fully repaired.");
       return;
@@ -874,7 +1259,29 @@ export default class WorldScene extends Phaser.Scene {
 
     this.playerStats.gold -= 30;
     this.castleHealth = Math.min(this.maxCastleHealth, this.castleHealth + 90);
+
+    this.updateQuestProgress("repair1", 1);
     this.showMessage("Castle repaired. +90 castle HP.");
+    this.updatePanels();
+  }
+
+  updateQuestProgress(id, value) {
+    const quest = this.quests.find((q) => q.id === id);
+    if (!quest || quest.done) return;
+
+    if (id === "kill5" || id === "survive3" || id === "boss1") {
+      quest.progress = Math.min(quest.target, value);
+    } else {
+      quest.progress = Math.min(quest.target, quest.progress + value);
+    }
+
+    if (quest.progress >= quest.target) {
+      quest.done = true;
+      this.playerStats.gold += quest.rewardGold;
+      this.playerStats.xp += quest.rewardXp;
+      this.showMessage(`Quest complete: ${quest.title}. Reward: ${quest.rewardGold} gold, ${quest.rewardXp} XP.`);
+    }
+
     this.updatePanels();
   }
 
@@ -888,11 +1295,15 @@ export default class WorldScene extends Phaser.Scene {
         x: this.player.x,
         y: this.player.y,
       },
+      quests: this.quests,
       savedAt: new Date().toISOString(),
     };
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
-    this.showMessage("Game saved. Press L anytime to load.");
+
+    this.lastSavedText = new Date(saveData.savedAt).toLocaleString();
+    this.showMessage("Game saved.");
+    this.updateUI();
   }
 
   loadGame() {
@@ -909,28 +1320,38 @@ export default class WorldScene extends Phaser.Scene {
       this.wave = saveData.wave ?? 1;
       this.castleHealth = saveData.castleHealth ?? 500;
       this.maxCastleHealth = saveData.maxCastleHealth ?? 500;
+
       this.playerStats = {
         ...this.playerStats,
         ...(saveData.playerStats ?? {}),
+        loot: {
+          ...this.playerStats.loot,
+          ...(saveData.playerStats?.loot ?? {}),
+        },
       };
+
+      this.quests = saveData.quests ?? this.quests;
 
       if (saveData.playerPosition) {
         this.player.x = saveData.playerPosition.x ?? 520;
         this.player.y = saveData.playerPosition.y ?? 545;
       }
 
-      this.clearEnemiesAndProjectiles();
+      this.lastSavedText = saveData.savedAt ? new Date(saveData.savedAt).toLocaleString() : "Unknown";
+
+      this.clearEnemiesProjectilesLoot();
       this.spawnWave();
 
-      this.showMessage("Game loaded. Current live enemies were reset for safety.");
+      this.showMessage("Game loaded. Active enemies reset for safety.");
       this.updatePanels();
+      this.updateUI();
     } catch (error) {
       console.error(error);
       this.showMessage("Save file is corrupted. Could not load.");
     }
   }
 
-  clearEnemiesAndProjectiles() {
+  clearEnemiesProjectilesLoot() {
     this.enemies.children.iterate((enemy) => {
       if (!enemy) return;
       if (enemy.hpBar) enemy.hpBar.destroy();
@@ -944,8 +1365,21 @@ export default class WorldScene extends Phaser.Scene {
       projectile.destroy();
     });
 
+    this.enemyProjectiles.children.iterate((projectile) => {
+      if (!projectile) return;
+      projectile.destroy();
+    });
+
+    this.lootDrops.children.iterate((loot) => {
+      if (!loot) return;
+      if (loot.label) loot.label.destroy();
+      loot.destroy();
+    });
+
     this.enemies.clear(true, true);
     this.projectiles.clear(true, true);
+    this.enemyProjectiles.clear(true, true);
+    this.lootDrops.clear(true, true);
   }
 
   getNearestEnemy(source) {
@@ -990,11 +1424,11 @@ export default class WorldScene extends Phaser.Scene {
     if (!enemy.hpBar || !enemy.hpBack) return;
 
     enemy.hpBack.x = enemy.x;
-    enemy.hpBack.y = enemy.y - 42;
+    enemy.hpBack.y = enemy.y - 48;
 
     enemy.hpBar.x = enemy.x;
-    enemy.hpBar.y = enemy.y - 42;
-    enemy.hpBar.width = Math.max(3, 34 * (enemy.hp / enemy.maxHp));
+    enemy.hpBar.y = enemy.y - 48;
+    enemy.hpBar.width = Math.max(3, 44 * (enemy.hp / enemy.maxHp));
   }
 
   updateLabels() {
@@ -1010,28 +1444,34 @@ export default class WorldScene extends Phaser.Scene {
     this.castleHpText.setText(
       `Castle HP: ${Math.max(0, Math.floor(this.castleHealth))}/${this.maxCastleHealth}`
     );
+
+    this.saveInfoText.setText(`Save: ${this.lastSavedText}`);
   }
 
   updateHelpPanel() {
     if (!this.helpVisible) {
-      this.helpPanel.setText("H = Show keys");
+      this.helpPanel.setVisible(true);
+      this.helpPanel.setText("H: Keys");
       return;
     }
 
+    this.helpPanel.setVisible(true);
     this.helpPanel.setText(
       [
         "KEYS",
-        "WASD/Arrows Move",
-        "Shift Sprint",
-        "Space Attack",
+        "WASD Move",
+        "Shift Run",
+        "Space Hit",
         "E Talk",
         "B Shop",
-        "I Inventory",
-        "U Use potion",
-        "R Repair castle",
+        "I Bag",
+        "Q Quest",
+        "U Potion",
+        "R Repair",
         "P Save",
         "L Load",
-        "H Hide keys",
+        "ESC Pause",
+        "H Hide",
       ].join("\n")
     );
   }
@@ -1040,6 +1480,7 @@ export default class WorldScene extends Phaser.Scene {
     if (this.shopOpen) {
       const swordCost = 60 + this.playerStats.swordLevel * 25;
 
+      this.shopPanel.setVisible(true);
       this.shopPanel.setText(
         [
           "SHOP",
@@ -1051,9 +1492,13 @@ export default class WorldScene extends Phaser.Scene {
       );
     } else {
       this.shopPanel.setText("");
+      this.shopPanel.setVisible(false);
     }
 
     if (this.inventoryOpen) {
+      const loot = this.playerStats.loot;
+
+      this.inventoryPanel.setVisible(true);
       this.inventoryPanel.setText(
         [
           "INVENTORY",
@@ -1061,13 +1506,84 @@ export default class WorldScene extends Phaser.Scene {
           `Sword Lv: ${this.playerStats.swordLevel}`,
           `Damage: ${this.playerStats.damage}`,
           `Kills: ${this.playerStats.kills}`,
-          "U Use potion",
+          `Coins: ${loot.goblinCoin}`,
+          `Fur: ${loot.wolfFur}`,
+          `Teeth: ${loot.orcTooth}`,
+          `Bones: ${loot.trollBone}`,
+          `Crystals: ${loot.magicCrystal}`,
           "I Close inventory",
         ].join("\n")
       );
     } else {
       this.inventoryPanel.setText("");
+      this.inventoryPanel.setVisible(false);
     }
+
+    if (this.questOpen) {
+      const questLines = this.quests.map((q) => {
+        const mark = q.done ? "DONE" : `${q.progress}/${q.target}`;
+        return `${mark} ${q.title}`;
+      });
+
+      this.questPanel.setVisible(true);
+      this.questPanel.setText(["QUESTS", ...questLines, "Q Close quests"].join("\n"));
+    } else {
+      this.questPanel.setText("");
+      this.questPanel.setVisible(false);
+    }
+  }
+
+  updatePausePanel() {
+    if (!this.isPaused) {
+      this.pausePanel.setText("");
+      this.pausePanel.setVisible(false);
+      return;
+    }
+
+    this.pausePanel.setVisible(true);
+    this.pausePanel.setText(
+      [
+        "PAUSED",
+        "ESC Resume",
+        "P Save",
+        "L Load",
+      ].join("\n")
+    );
+  }
+
+  updateMinimap() {
+    const x = 780;
+    const y = 390;
+    const w = 160;
+    const h = 120;
+
+    this.minimap.clear();
+
+    this.minimap.fillStyle(0x020617, 0.82);
+    this.minimap.fillRoundedRect(x, y, w, h, 8);
+    this.minimap.lineStyle(2, 0x94a3b8, 1);
+    this.minimap.strokeRoundedRect(x, y, w, h, 8);
+
+    const sx = w / this.worldW;
+    const sy = h / this.worldH;
+
+    const drawPoint = (worldX, worldY, color, size = 3) => {
+      this.minimap.fillStyle(color, 1);
+      this.minimap.fillCircle(x + worldX * sx, y + worldY * sy, size);
+    };
+
+    drawPoint(this.castle.x, this.castle.y, 0x94a3b8, 5);
+    drawPoint(this.player.x, this.player.y, 0x38bdf8, 4);
+
+    this.npcs.forEach((npc) => drawPoint(npc.x, npc.y, 0xfacc15, 3));
+
+    this.enemies.children.iterate((enemy) => {
+      if (enemy && enemy.active) drawPoint(enemy.x, enemy.y, enemy.isBoss ? 0xfacc15 : 0xef4444, enemy.isBoss ? 5 : 3);
+    });
+
+    this.lootDrops.children.iterate((loot) => {
+      if (loot && loot.active) drawPoint(loot.x, loot.y, 0xa78bfa, 2);
+    });
   }
 
   showMessage(message) {
@@ -1099,13 +1615,14 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   gameOver() {
-    this.scene.pause();
+    this.isPaused = true;
+    this.physics.world.pause();
 
     const bg = this.add.rectangle(480, 270, 600, 230, 0x111827, 0.94);
     bg.setScrollFactor(0);
     bg.setDepth(10000);
 
-    const text = this.add.text(275, 205, "GAME OVER\nCastle Destroyed\nPress browser refresh to restart", {
+    const text = this.add.text(275, 205, "GAME OVER\nCastle Destroyed\nRefresh browser to restart", {
       fontSize: "32px",
       color: "#ef4444",
       align: "center",
