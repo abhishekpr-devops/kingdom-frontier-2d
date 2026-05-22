@@ -5,3 +5,6 @@ dist/
 .vscode/
 
 backups/
+
+# Local Netlify folder
+.netlify
