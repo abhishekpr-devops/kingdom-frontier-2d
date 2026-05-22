@@ -7,6 +7,10 @@ export default class WorldScene extends Phaser.Scene {
     super("WorldScene");
   }
 
+  init(data) {
+    this.skipMainMenuOnStart = Boolean(data?.skipMainMenu);
+  }
+
   create() {
     this.worldW = 2400;
     this.worldH = 1500;
@@ -40,7 +44,7 @@ export default class WorldScene extends Phaser.Scene {
     this.upgradeOpen = false;
     this.isPaused = false;
     this.gameEnded = false;
-    this.mainMenuOpen = true;
+    this.mainMenuOpen = !this.skipMainMenuOnStart;
     this.soundEnabled = true;
     this.lastSavedText = "Never";
 
@@ -134,8 +138,13 @@ export default class WorldScene extends Phaser.Scene {
     this.createMainMenu();
     this.spawnWave();
 
-    this.physics.world.pause();
-    this.showMessage("Main menu open. Press N for new game or L to load.");
+    if (this.skipMainMenuOnStart) {
+      this.hideMainMenu();
+      this.showMessage("New game started.");
+    } else {
+      this.physics.world.pause();
+      this.showMessage("Main menu open. Press N for new game or L to load.");
+    }
   }
 
   createWorld() {
@@ -2313,17 +2322,11 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   restartGame() {
-    // Restart the Phaser scene without refreshing the browser page.
-    this.gameEnded = false;
-    this.isPaused = false;
-    this.mainMenuOpen = false;
-
-    if (this.physics && this.physics.world) {
-      this.physics.world.resume();
-    }
-
-    this.scene.restart();
+    // Direct restart after Game Over.
+    // Important: skip main menu and immediately start a fresh game.
+    this.scene.restart({ skipMainMenu: true });
   }
+
 
   heroGameOver() {
     if (this.gameEnded) return;
@@ -2356,7 +2359,7 @@ export default class WorldScene extends Phaser.Scene {
     title.setScrollFactor(0);
     title.setDepth(10002);
 
-    const body = this.add.text(480, 285, "The hero has fallen.\nENTER or R = Restart\nTip: Use potions with U before HP reaches 0.", {
+    const body = this.add.text(480, 285, "The hero has fallen.\nENTER or R = New Game\nTip: Use potions with U before HP reaches 0.", {
       fontSize: "20px",
       color: "#ffffff",
       align: "center",
@@ -3510,7 +3513,7 @@ export default class WorldScene extends Phaser.Scene {
     bg.setScrollFactor(0);
     bg.setDepth(10001);
 
-    const text = this.add.text(480, 270, "GAME OVER\nCastle Destroyed\nENTER or R = Restart", {
+    const text = this.add.text(480, 270, "GAME OVER\nCastle Destroyed\nENTER or R = New Game", {
       fontSize: "32px",
       color: "#ef4444",
       align: "center",
