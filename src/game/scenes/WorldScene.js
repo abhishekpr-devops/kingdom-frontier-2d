@@ -380,6 +380,11 @@ export default class WorldScene extends Phaser.Scene {
     ally.range = type === "Archer" ? 320 : 95;
     ally.speed = type === "Archer" ? 45 : 75;
     ally.lastAttack = 0;
+    ally.currentTarget = null;
+    ally.nextTargetCheck = 0;
+    ally.nextMoveDecision = 0;
+    ally.holdX = x;
+    ally.holdY = y;
     ally.homeX = x;
     ally.homeY = y;
     ally.wanderX = x;
@@ -936,52 +941,101 @@ export default class WorldScene extends Phaser.Scene {
     this.allies.children.iterate((ally) => {
       if (!ally || !ally.active) return;
 
-      const nearest = this.getNearestEnemy(ally);
-      const enemy = nearest?.enemy;
-      const distance = nearest?.distance ?? Infinity;
+      // Do not change target every frame. This prevents shaking/vibration.
+      if (!ally.currentTarget || !ally.currentTarget.active || time > ally.nextTargetCheck) {
+        const nearest = this.getNearestEnemy(ally);
+        ally.currentTarget = nearest?.enemy ?? null;
+        ally.nextTargetCheck = time + 350;
+      }
 
-      if (enemy && distance < ally.range) {
-        if (ally.type === "Knight") {
-          if (distance > 45) {
-            this.physics.moveTo(ally, enemy.x, enemy.y, ally.speed);
-          } else {
-            ally.body.setVelocity(0);
-          }
+      const enemy = ally.currentTarget;
 
-          if (distance < 70 && time - ally.lastAttack > 900) {
-            ally.lastAttack = time;
-            enemy.hp -= ally.damage;
-            this.showDamage(enemy.x, enemy.y, ally.damage, "#93c5fd");
-
-            this.tweens.add({
-              targets: ally.bodyShape,
-              scaleX: 1.25,
-              scaleY: 1.25,
-              yoyo: true,
-              duration: 100,
-            });
-
-            if (enemy.hp <= 0) this.killEnemy(enemy);
-          }
-        } else {
-          if (distance < 170) {
-            const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, ally.x, ally.y);
-            this.physics.moveTo(ally, ally.x + Math.cos(angle) * 80, ally.y + Math.sin(angle) * 80, ally.speed);
-          } else if (distance > 280) {
-            this.physics.moveTo(ally, enemy.x, enemy.y, ally.speed * 0.55);
-          } else {
-            this.freeAllyWander(ally, time);
-          }
-
-          if (time - ally.lastAttack > 1450) {
-            ally.lastAttack = time;
-            this.shootProjectile(ally, enemy, ally.damage, 0xfacc15);
-          }
-        }
-      } else {
+      if (!enemy || !enemy.active) {
         this.freeAllyWander(ally, time);
+        return;
+      }
+
+      const distance = Phaser.Math.Distance.Between(ally.x, ally.y, enemy.x, enemy.y);
+
+      if (distance > ally.range) {
+        ally.currentTarget = null;
+        this.freeAllyWander(ally, time);
+        return;
+      }
+
+      if (ally.type === "Knight") {
+        this.updateKnightAlly(ally, enemy, distance, time);
+      } else {
+        this.updateArcherAlly(ally, enemy, distance, time);
       }
     });
+  }
+
+  updateKnightAlly(ally, enemy, distance, time) {
+    const stopDistance = 58;
+
+    // Movement decision is throttled. This avoids tiny back-and-forth corrections.
+    if (distance > stopDistance) {
+      if (time > ally.nextMoveDecision) {
+        ally.nextMoveDecision = time + 220;
+        this.physics.moveTo(ally, enemy.x, enemy.y, ally.speed);
+      }
+    } else {
+      ally.body.setVelocity(0);
+    }
+
+    if (distance < 72 && time - ally.lastAttack > 950) {
+      ally.lastAttack = time;
+      ally.body.setVelocity(0);
+
+      enemy.hp -= ally.damage;
+      this.showDamage(enemy.x, enemy.y, ally.damage, "#93c5fd");
+
+      this.tweens.add({
+        targets: ally.bodyShape,
+        scaleX: 1.18,
+        scaleY: 1.18,
+        yoyo: true,
+        duration: 90,
+      });
+
+      if (enemy.hp <= 0) this.killEnemy(enemy);
+    }
+  }
+
+  updateArcherAlly(ally, enemy, distance, time) {
+    const dangerDistance = 145;
+    const goodMin = 190;
+    const goodMax = 295;
+
+    // Archers hold position when they are already in a good range.
+    // This removes the constant jitter while attacking.
+    if (distance < dangerDistance) {
+      if (time > ally.nextMoveDecision) {
+        ally.nextMoveDecision = time + 450;
+
+        const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, ally.x, ally.y);
+        ally.holdX = Phaser.Math.Clamp(ally.x + Math.cos(angle) * 120, 40, this.worldW - 40);
+        ally.holdY = Phaser.Math.Clamp(ally.y + Math.sin(angle) * 120, 40, this.worldH - 40);
+
+        this.physics.moveTo(ally, ally.holdX, ally.holdY, ally.speed);
+      }
+    } else if (distance > goodMax) {
+      if (time > ally.nextMoveDecision) {
+        ally.nextMoveDecision = time + 450;
+        this.physics.moveTo(ally, enemy.x, enemy.y, ally.speed * 0.45);
+      }
+    } else if (distance >= goodMin && distance <= goodMax) {
+      ally.body.setVelocity(0);
+    } else {
+      ally.body.setVelocity(0);
+    }
+
+    if (distance < ally.range && time - ally.lastAttack > 1500) {
+      ally.lastAttack = time;
+      ally.body.setVelocity(0);
+      this.shootProjectile(ally, enemy, ally.damage, 0xfacc15);
+    }
   }
 
   freeAllyWander(ally, time) {
@@ -1005,8 +1059,11 @@ export default class WorldScene extends Phaser.Scene {
 
     const dist = Phaser.Math.Distance.Between(ally.x, ally.y, ally.wanderX, ally.wanderY);
 
-    if (dist > 12) {
-      this.physics.moveTo(ally, ally.wanderX, ally.wanderY, ally.speed * 0.45);
+    if (dist > 28) {
+      if (time > ally.nextMoveDecision) {
+        ally.nextMoveDecision = time + 500;
+        this.physics.moveTo(ally, ally.wanderX, ally.wanderY, ally.speed * 0.35);
+      }
     } else {
       ally.body.setVelocity(0);
     }
