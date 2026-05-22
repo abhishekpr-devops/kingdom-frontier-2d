@@ -660,6 +660,10 @@ export default class WorldScene extends Phaser.Scene {
     enemy.isRanged = stats.isRanged;
     enemy.isBoss = isBoss;
     enemy.lastAttack = 0;
+    enemy.currentTargetKind = "castle";
+    enemy.currentTargetRef = null;
+    enemy.nextTargetCheck = 0;
+    enemy.nextMoveDecision = 0;
     enemy.nextWander = 0;
     enemy.wanderX = 0;
     enemy.wanderY = 0;
@@ -876,63 +880,146 @@ export default class WorldScene extends Phaser.Scene {
     this.enemies.children.iterate((enemy) => {
       if (!enemy || !enemy.active) return;
 
-      const playerDist = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y);
-      const castleDist = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.castle.x, this.castle.y);
-
-      let targetX = this.castle.x;
-      let targetY = this.castle.y;
-
-      if (playerDist < 190) {
-        targetX = this.player.x;
-        targetY = this.player.y;
-      } else {
-        const nearestAlly = this.getNearestAlly(enemy);
-        if (nearestAlly && nearestAlly.distance < 150) {
-          targetX = nearestAlly.ally.x;
-          targetY = nearestAlly.ally.y;
-        }
+      if (time > enemy.nextTargetCheck) {
+        this.chooseEnemyTarget(enemy);
+        enemy.nextTargetCheck = time + 450;
       }
+
+      const target = this.resolveEnemyTarget(enemy);
+
+      if (!target) {
+        enemy.body.setVelocity(0);
+        return;
+      }
+
+      const dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, target.x, target.y);
 
       if (enemy.isRanged) {
-        this.updateRangedEnemy(enemy, targetX, targetY, time);
+        this.updateRangedEnemy(enemy, target.x, target.y, time);
       } else {
-        this.updateMeleeEnemy(enemy, targetX, targetY, time);
-      }
-
-      if (castleDist < 115) {
-        enemy.body.setVelocity(0);
-        this.castleHealth -= enemy.isBoss ? 0.22 : 0.09;
-        if (this.castleHealth <= 0) this.gameOver();
+        this.updateMeleeEnemy(enemy, target.x, target.y, time, target.kind, dist);
       }
 
       this.updateEnemyHealthBar(enemy);
     });
   }
 
-  updateMeleeEnemy(enemy, targetX, targetY, time) {
-    if (time > enemy.nextWander) {
-      enemy.nextWander = time + Phaser.Math.Between(700, 1400);
-      enemy.wanderX = Phaser.Math.Between(-70, 70);
-      enemy.wanderY = Phaser.Math.Between(-70, 70);
+  chooseEnemyTarget(enemy) {
+    const playerDist = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.player.x, this.player.y);
+    const castleDist = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.castleGatePoint.x, this.castleGatePoint.y);
+    const nearestAlly = this.getNearestAlly(enemy);
+
+    if (playerDist < 155) {
+      enemy.currentTargetKind = "player";
+      enemy.currentTargetRef = this.player;
+      return;
     }
 
-    this.physics.moveTo(enemy, targetX + enemy.wanderX, targetY + enemy.wanderY, enemy.speed);
+    if (nearestAlly && nearestAlly.distance < 135) {
+      enemy.currentTargetKind = "ally";
+      enemy.currentTargetRef = nearestAlly.ally;
+      return;
+    }
+
+    enemy.currentTargetKind = "castle";
+    enemy.currentTargetRef = null;
+  }
+
+  resolveEnemyTarget(enemy) {
+    if (enemy.currentTargetKind === "player") {
+      return {
+        kind: "player",
+        x: this.player.x,
+        y: this.player.y,
+      };
+    }
+
+    if (enemy.currentTargetKind === "ally" && enemy.currentTargetRef && enemy.currentTargetRef.active) {
+      return {
+        kind: "ally",
+        x: enemy.currentTargetRef.x,
+        y: enemy.currentTargetRef.y,
+      };
+    }
+
+    return {
+      kind: "castle",
+      x: this.castleGatePoint.x,
+      y: this.castleGatePoint.y,
+    };
+  }
+
+  updateMeleeEnemy(enemy, targetX, targetY, time, targetKind = "castle", distance = null) {
+    const dist = distance ?? Phaser.Math.Distance.Between(enemy.x, enemy.y, targetX, targetY);
+
+    const attackDistance = targetKind === "castle" ? 92 : 54;
+
+    // Lock enemy in attack range. Do not let it wander away while attacking.
+    if (dist <= attackDistance) {
+      enemy.body.setVelocity(0);
+
+      if (targetKind === "castle") {
+        this.castleHealth -= enemy.isBoss ? 0.28 : 0.12;
+        if (this.castleHealth <= 0) this.gameOver();
+      }
+
+      if (targetKind === "player" && time - enemy.lastAttack > 900) {
+        enemy.lastAttack = time;
+        this.damagePlayer(enemy);
+      }
+
+      if (targetKind === "ally" && time - enemy.lastAttack > 950) {
+        enemy.lastAttack = time;
+        this.showDamage(targetX, targetY, enemy.damage, "#ef4444");
+      }
+
+      return;
+    }
+
+    // Only choose wander offset while far. This prevents near-target vibration.
+    if (time > enemy.nextWander) {
+      enemy.nextWander = time + Phaser.Math.Between(900, 1600);
+      enemy.wanderX = targetKind === "castle" ? Phaser.Math.Between(-25, 25) : 0;
+      enemy.wanderY = targetKind === "castle" ? Phaser.Math.Between(-25, 25) : 0;
+    }
+
+    if (time > enemy.nextMoveDecision) {
+      enemy.nextMoveDecision = time + 260;
+      this.physics.moveTo(
+        enemy,
+        targetX + enemy.wanderX,
+        targetY + enemy.wanderY,
+        enemy.speed
+      );
+    }
   }
 
   updateRangedEnemy(enemy, targetX, targetY, time) {
     const dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, targetX, targetY);
 
-    if (dist > 280) {
-      this.physics.moveTo(enemy, targetX, targetY, enemy.speed);
-    } else if (dist < 180) {
-      const angle = Phaser.Math.Angle.Between(targetX, targetY, enemy.x, enemy.y);
-      this.physics.moveTo(enemy, enemy.x + Math.cos(angle) * 80, enemy.y + Math.sin(angle) * 80, enemy.speed);
+    const minRange = 210;
+    const maxRange = 330;
+
+    if (dist > maxRange) {
+      if (time > enemy.nextMoveDecision) {
+        enemy.nextMoveDecision = time + 420;
+        this.physics.moveTo(enemy, targetX, targetY, enemy.speed);
+      }
+    } else if (dist < minRange) {
+      if (time > enemy.nextMoveDecision) {
+        enemy.nextMoveDecision = time + 520;
+        const angle = Phaser.Math.Angle.Between(targetX, targetY, enemy.x, enemy.y);
+        const fleeX = Phaser.Math.Clamp(enemy.x + Math.cos(angle) * 120, 40, this.worldW - 40);
+        const fleeY = Phaser.Math.Clamp(enemy.y + Math.sin(angle) * 120, 40, this.worldH - 40);
+        this.physics.moveTo(enemy, fleeX, fleeY, enemy.speed);
+      }
     } else {
       enemy.body.setVelocity(0);
     }
 
-    if (dist < 340 && time - enemy.lastAttack > 1700) {
+    if (dist < 360 && time - enemy.lastAttack > 1800) {
       enemy.lastAttack = time;
+      enemy.body.setVelocity(0);
       this.shootEnemyProjectile(enemy, targetX, targetY);
     }
   }
