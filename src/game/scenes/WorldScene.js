@@ -488,6 +488,11 @@ export default class WorldScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.keys.E)) this.talkToNPC();
 
     if (Phaser.Input.Keyboard.JustDown(this.keys.B)) {
+      if (!this.shopOpen && !this.isNearShopNPC()) {
+        this.showMessage("You must stand near the Merchant or Blacksmith to open the shop.");
+        return;
+      }
+
       this.shopOpen = !this.shopOpen;
       this.showMessage(this.shopOpen ? "Shop opened. Press 1, 2, or 3." : "Shop closed.");
       this.updatePanels();
@@ -789,6 +794,25 @@ export default class WorldScene extends Phaser.Scene {
     } else {
       this.showMessage("No NPC nearby.");
     }
+  }
+
+  isNearShopNPC() {
+    return this.npcs.some((npc) => {
+      const isShopNPC = npc.name === "Merchant" || npc.name === "Blacksmith";
+
+      if (!isShopNPC) {
+        return false;
+      }
+
+      const distance = Phaser.Math.Distance.Between(
+        this.player.x,
+        this.player.y,
+        npc.x,
+        npc.y
+      );
+
+      return distance < 120;
+    });
   }
 
   buyPotion() {
