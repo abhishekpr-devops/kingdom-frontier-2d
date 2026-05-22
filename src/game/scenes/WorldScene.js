@@ -124,6 +124,7 @@ export default class WorldScene extends Phaser.Scene {
     this.createAllies();
     this.createGroups();
     this.createInput();
+    this.registerRestartKeys();
     this.createCamera();
     this.createCombat();
     this.createFixedUI();
@@ -637,6 +638,22 @@ export default class WorldScene extends Phaser.Scene {
       O: Phaser.Input.Keyboard.KeyCodes.O,
       N: Phaser.Input.Keyboard.KeyCodes.N,
       M: Phaser.Input.Keyboard.KeyCodes.M,
+      ENTER: Phaser.Input.Keyboard.KeyCodes.ENTER,
+    });
+  }
+
+  registerRestartKeys() {
+    // These listeners work even after Game Over because they do not depend on update().
+    this.input.keyboard.on("keydown-ENTER", () => {
+      if (this.gameEnded) {
+        this.restartGame();
+      }
+    });
+
+    this.input.keyboard.on("keydown-R", () => {
+      if (this.gameEnded) {
+        this.restartGame();
+      }
     });
   }
 
@@ -1976,6 +1993,19 @@ export default class WorldScene extends Phaser.Scene {
     this.heroGameOver();
   }
 
+  restartGame() {
+    // Restart the Phaser scene without refreshing the browser page.
+    this.gameEnded = false;
+    this.isPaused = false;
+    this.mainMenuOpen = false;
+
+    if (this.physics && this.physics.world) {
+      this.physics.world.resume();
+    }
+
+    this.scene.restart();
+  }
+
   heroGameOver() {
     if (this.gameEnded) return;
 
@@ -2007,7 +2037,7 @@ export default class WorldScene extends Phaser.Scene {
     title.setScrollFactor(0);
     title.setDepth(10002);
 
-    const body = this.add.text(480, 285, "The hero has fallen.\nRefresh the browser to restart.\nTip: Use potions with U before HP reaches 0.", {
+    const body = this.add.text(480, 285, "The hero has fallen.\nENTER or R = Restart\nTip: Use potions with U before HP reaches 0.", {
       fontSize: "20px",
       color: "#ffffff",
       align: "center",
@@ -3161,7 +3191,7 @@ export default class WorldScene extends Phaser.Scene {
     bg.setScrollFactor(0);
     bg.setDepth(10001);
 
-    const text = this.add.text(480, 270, "GAME OVER\nCastle Destroyed\nRefresh browser to restart", {
+    const text = this.add.text(480, 270, "GAME OVER\nCastle Destroyed\nENTER or R = Restart", {
       fontSize: "32px",
       color: "#ef4444",
       align: "center",
