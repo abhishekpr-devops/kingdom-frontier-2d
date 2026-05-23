@@ -2925,23 +2925,26 @@ export default class WorldScene extends Phaser.Scene {
   playerSpecialAttack(time) {
     if (this.gameEnded || this.mainMenuOpen || this.isPaused || this.upgradeCardOpen) return;
 
+    this.fixStaminaNaN?.();
+
     const cooldown = 900;
+    const staminaCost = Number(this.specialAttackStaminaCost || 35);
 
     if (time - this.lastSpecialAttackTime < cooldown) {
       this.showMessage("Special attack cooling down.");
       return;
     }
 
-    if (this.playerStats.stamina < this.specialAttackStaminaCost) {
-      this.showMessage(`Not enough stamina. Need ${this.specialAttackStaminaCost}.`);
+    if (this.playerStats.stamina < staminaCost) {
+      this.showMessage(`Not enough stamina. Need ${staminaCost}.`);
       return;
     }
 
-    this.playerStats.stamina -= this.specialAttackStaminaCost;
+    this.playerStats.stamina = Math.max(0, this.playerStats.stamina - staminaCost);
     this.lastSpecialAttackTime = time;
 
-    const range = this.specialAttackRange;
-    const damage = Math.floor(this.playerStats.damage * 1.55);
+    const range = this.specialAttackRange || 155;
+    const damage = Math.floor((this.playerStats.damage || 25) * 1.55);
 
     this.playUnitAttackAnimation?.(this.player);
     this.playSound?.("attack");
@@ -2997,9 +3000,10 @@ export default class WorldScene extends Phaser.Scene {
     });
 
     this.cameras.main.shake(120, 0.004);
-    this.showMessage(hitCount > 0 ? `Special attack hit ${hitCount} enemies.` : "Special attack missed.");
+    this.showMessage(hitCount > 0 ? `Special attack hit ${hitCount} enemies. -${staminaCost} ST` : `Special attack missed. -${staminaCost} ST`);
     this.updateUI?.();
   }
+
 
   playerAttack(time) {
     if (time - this.lastPlayerAttack < 420) return;
@@ -4424,6 +4428,7 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   updateUI() {
+    this.fixStaminaNaN?.();
     this.fixStaminaNaN?.();
     this.goldText.setText(
       `HP:${Math.floor(this.playerStats.hp)}/${this.playerStats.maxHp}  ST:${Math.floor(Number.isFinite(Number(this.playerStats.stamina)) ? Number(this.playerStats.stamina) : 100)}  Gold:${this.playerStats.gold}  XP:${this.playerStats.xp}  Lv:${this.playerStats.level}  Wave:${this.wave}`
