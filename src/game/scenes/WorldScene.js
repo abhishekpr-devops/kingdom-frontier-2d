@@ -42,6 +42,9 @@ export default class WorldScene extends Phaser.Scene {
     this.inventoryOpen = false;
     this.questOpen = false;
     this.upgradeOpen = false;
+    this.upgradeCardOpen = false;
+    this.waveActive = false;
+    this.currentUpgradeCards = [];
     this.isPaused = false;
     this.gameEnded = false;
     this.mainMenuOpen = !this.skipMainMenuOnStart;
@@ -1283,7 +1286,185 @@ export default class WorldScene extends Phaser.Scene {
     this.showMessage("Game started. Press H for controls.");
   }
 
+  handleWaveClearUpgradeCards(time) {
+    if (!this.waveActive || this.upgradeCardOpen || this.gameEnded || this.mainMenuOpen) return;
+    if (!this.enemies || this.enemies.countActive(true) > 0) return;
+
+    this.waveActive = false;
+    this.upgradeCardOpen = true;
+    this.waveCooldown = true;
+
+    this.showWaveUpgradeCards();
+  }
+
+  showWaveUpgradeCards() {
+    const pool = [
+      {
+        title: "Knight Vanguard",
+        desc: "All knights: +4 damage, +25 HP",
+        apply: () => {
+          this.allies.children.iterate((ally) => {
+            if (!ally || !ally.active) return;
+            if (ally.role === "knight") {
+              ally.damage += 4;
+              ally.maxHp += 25;
+              ally.hp = Math.min(ally.maxHp, ally.hp + 25);
+            }
+          });
+        },
+      },
+      {
+        title: "Archer Volley",
+        desc: "Archers: +4 damage, +160 range",
+        apply: () => {
+          this.allies.children.iterate((ally) => {
+            if (!ally || !ally.active) return;
+            if (ally.role === "archer" || ally.role === "castleArcher") {
+              ally.damage += 4;
+              ally.range += 160;
+            }
+          });
+        },
+      },
+      {
+        title: "Healer Blessing",
+        desc: "Healer: faster movement, stronger healing",
+        apply: () => {
+          this.allies.children.iterate((ally) => {
+            if (!ally || !ally.active) return;
+            if (ally.role === "healer") {
+              ally.speed += 10;
+              ally.maxHp += 30;
+              ally.hp = ally.maxHp;
+            }
+          });
+
+          this.playerStats.maxHp += 10;
+          this.playerStats.hp = Math.min(this.playerStats.maxHp, this.playerStats.hp + 25);
+        },
+      },
+      {
+        title: "Castle Guard",
+        desc: "Castle: +120 HP and repair 120",
+        apply: () => {
+          this.maxCastleHealth += 120;
+          this.castleHealth = Math.min(this.maxCastleHealth, this.castleHealth + 120);
+          this.updateCastleDamageVisuals?.();
+        },
+      },
+      {
+        title: "Hero Training",
+        desc: "Player: +6 damage, +20 max HP",
+        apply: () => {
+          this.playerStats.damage += 6;
+          this.playerStats.maxHp += 20;
+          this.playerStats.hp = Math.min(this.playerStats.maxHp, this.playerStats.hp + 20);
+        },
+      },
+      {
+        title: "Battle Supplies",
+        desc: "+90 gold and +2 potions",
+        apply: () => {
+          this.playerStats.gold += 90;
+          this.playerStats.potions += 2;
+        },
+      },
+    ];
+
+    this.currentUpgradeCards = Phaser.Utils.Array.Shuffle([...pool]).slice(0, 3);
+
+    this.upgradeCardObjects = [];
+
+    const overlay = this.add.rectangle(480, 270, 960, 540, 0x020617, 0.78);
+    overlay.setScrollFactor(0);
+    overlay.setDepth(30000);
+
+    const title = this.add.text(480, 115, `Wave ${this.wave} cleared. Choose an upgrade`, {
+      fontSize: "24px",
+      color: "#facc15",
+      fontFamily: "monospace",
+      fontStyle: "bold",
+      align: "center",
+    });
+    title.setOrigin(0.5);
+    title.setScrollFactor(0);
+    title.setDepth(30001);
+
+    this.upgradeCardObjects.push(overlay, title);
+
+    this.currentUpgradeCards.forEach((card, index) => {
+      const x = 245 + index * 235;
+      const panel = this.add.rectangle(x, 285, 205, 230, 0x111827, 0.96);
+      panel.setScrollFactor(0);
+      panel.setDepth(30001);
+
+      const cardText = this.add.text(x, 285, [
+        `${index + 1}`,
+        "",
+        card.title,
+        "",
+        card.desc,
+      ].join("\n"), {
+        fontSize: "15px",
+        color: "#ffffff",
+        fontFamily: "monospace",
+        align: "center",
+        lineSpacing: 6,
+        wordWrap: { width: 175 },
+      });
+      cardText.setOrigin(0.5);
+      cardText.setScrollFactor(0);
+      cardText.setDepth(30002);
+
+      this.upgradeCardObjects.push(panel, cardText);
+    });
+
+    const help = this.add.text(480, 445, "Press 1, 2, or 3 to choose", {
+      fontSize: "16px",
+      color: "#93c5fd",
+      fontFamily: "monospace",
+      align: "center",
+    });
+    help.setOrigin(0.5);
+    help.setScrollFactor(0);
+    help.setDepth(30002);
+
+    this.upgradeCardObjects.push(help);
+  }
+
+  chooseWaveUpgrade(index) {
+    if (!this.upgradeCardOpen) return;
+
+    const card = this.currentUpgradeCards[index];
+    if (!card) return;
+
+    card.apply();
+
+    this.showMessage(`Upgrade chosen: ${card.title}`);
+    this.playSound?.("upgrade");
+
+    if (this.upgradeCardObjects) {
+      this.upgradeCardObjects.forEach((obj) => {
+        if (obj && obj.destroy) obj.destroy();
+      });
+    }
+
+    this.upgradeCardObjects = [];
+    this.currentUpgradeCards = [];
+    this.upgradeCardOpen = false;
+
+    this.wave += 1;
+    this.updateQuestProgress?.("survive3", this.wave);
+    this.updateUI?.();
+
+    this.time.delayedCall(800, () => {
+      this.waveCooldown = false;
+      this.spawnWave();
+    });
+  }
+
   spawnWave() {
+    if (this.upgradeCardOpen) return;
     if (this.waveCooldown) return;
 
     this.waveCooldown = true;
@@ -1310,6 +1491,7 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   startWaveNow() {
+    this.waveActive = true;
     const isBossWave = this.wave % 5 === 0;
     const count = isBossWave ? 8 + this.wave : 5 + this.wave * 2;
 
@@ -1686,6 +1868,7 @@ export default class WorldScene extends Phaser.Scene {
     this.movePlayer();
     this.updateEnemies(time);
     this.updateAllies(time);
+    this.handleWaveClearUpgradeCards(time);
     this.resolveUnitOverlap();
     this.updateUnitWalkBob(time);
     this.updateLabels();
@@ -1719,6 +1902,14 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   handleHotkeys(time) {
+    if (this.upgradeCardOpen) {
+      if (Phaser.Input.Keyboard.JustDown(this.keys.ONE)) this.chooseWaveUpgrade(0);
+      if (Phaser.Input.Keyboard.JustDown(this.keys.TWO)) this.chooseWaveUpgrade(1);
+      if (Phaser.Input.Keyboard.JustDown(this.keys.THREE)) this.chooseWaveUpgrade(2);
+      return;
+    }
+
+
     if (Phaser.Input.Keyboard.JustDown(this.keys.ESC)) {
       this.togglePause();
       return;
@@ -2014,56 +2205,111 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   updateAllies(time) {
+    const roleCounts = {
+      knight: 0,
+      archer: 0,
+      castleArcher: 0,
+      healer: 0,
+      other: 0,
+    };
+
     this.allies.children.iterate((ally) => {
       if (!ally || !ally.active) return;
 
       this.updateAllyHealthBar?.(ally);
 
-      if (ally.role === "healer") {
+      const role = ally.role || "other";
+      const slotIndex = roleCounts[role] ?? 0;
+      roleCounts[role] = slotIndex + 1;
+
+      ally.formationSlot = this.getAllyFormationSlot(ally, slotIndex);
+
+      if (role === "healer") {
         this.updateHealerAlly(ally, time);
         return;
       }
 
-      if (ally.role === "castleArcher") {
-        ally.body.setVelocity(0);
+      if (role === "archer" || role === "castleArcher") {
+        const target = this.getBestEnemyTargetForAlly(ally, ally.range || 650, role === "castleArcher");
 
-        const target = this.getBestEnemyTargetForAlly(ally, ally.range || 850, true);
-
-        if (target && time - ally.lastAttack > 850) {
-          ally.lastAttack = time;
-          ally.currentTarget = target;
-          this.shootProjectile(ally, target, ally.damage || 16, 0xfacc15);
+        if (target) {
+          const distance = Phaser.Math.Distance.Between(ally.x, ally.y, target.x, target.y);
+          this.updateArcherAlly(ally, target, distance, time);
+        } else {
+          this.moveAllyToFormation(ally, time);
         }
 
         return;
       }
 
-      if (ally.role === "archer") {
-        const target = this.getBestEnemyTargetForAlly(ally, ally.range || 620, false);
+      // Knights stay in front of player and intercept enemies.
+      const target = this.getBestEnemyTargetForAlly(ally, 230, false);
 
-        if (!target) {
-          this.freeAllyWander(ally, time);
-          return;
-        }
-
+      if (target) {
         const distance = Phaser.Math.Distance.Between(ally.x, ally.y, target.x, target.y);
-        this.updateArcherAlly(ally, target, distance, time);
-        return;
+        this.updateKnightAlly(ally, target, distance, time);
+      } else {
+        this.moveAllyToFormation(ally, time);
       }
-
-      const target = this.getBestEnemyTargetForAlly(ally, ally.range || 180, false);
-
-      if (!target) {
-        this.freeAllyWander(ally, time);
-        return;
-      }
-
-      const distance = Phaser.Math.Distance.Between(ally.x, ally.y, target.x, target.y);
-      this.updateKnightAlly(ally, target, distance, time);
     });
   }
 
-  getBestEnemyTargetForAlly(ally, maxRange = 620, preferCastleThreat = false) {
+  getAllyFormationSlot(ally, slotIndex = 0) {
+    const px = this.player.x;
+    const py = this.player.y;
+
+    // Enemies mostly come from the right side, so front means right of the player.
+    if (ally.role === "knight") {
+      const slots = [
+        { x: px + 82, y: py - 38 },
+        { x: px + 82, y: py + 38 },
+        { x: px + 115, y: py },
+      ];
+
+      return slots[slotIndex % slots.length];
+    }
+
+    if (ally.role === "healer") {
+      return { x: px - 55, y: py };
+    }
+
+    if (ally.role === "archer") {
+      const slots = [
+        { x: px - 35, y: py - 92 },
+        { x: px - 35, y: py + 92 },
+        { x: px - 95, y: py - 55 },
+        { x: px - 95, y: py + 55 },
+      ];
+
+      return slots[slotIndex % slots.length];
+    }
+
+    if (ally.role === "castleArcher") {
+      return { x: px - 105, y: py - 5 };
+    }
+
+    return { x: px - 70, y: py + 70 };
+  }
+
+  moveAllyToFormation(ally, time) {
+    if (!ally.formationSlot) return;
+
+    const targetX = Phaser.Math.Clamp(ally.formationSlot.x, 50, this.worldW - 50);
+    const targetY = Phaser.Math.Clamp(ally.formationSlot.y, 50, this.worldH - 50);
+
+    const distance = Phaser.Math.Distance.Between(ally.x, ally.y, targetX, targetY);
+
+    if (distance > 22) {
+      if (time > ally.nextMoveDecision) {
+        ally.nextMoveDecision = time + 160;
+        this.physics.moveTo(ally, targetX, targetY, ally.speed || 65);
+      }
+    } else {
+      ally.body.setVelocity(0);
+    }
+  }
+
+  getBestEnemyTargetForAlly(ally, maxRange = 650, preferCastleThreat = false) {
     if (!this.enemies) return null;
 
     let bestEnemy = null;
@@ -2078,17 +2324,18 @@ export default class WorldScene extends Phaser.Scene {
       let score = distanceToAlly;
 
       if (preferCastleThreat && this.castleGatePoint) {
-        const distanceToCastle = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.castleGatePoint.x, this.castleGatePoint.y);
-        score = distanceToCastle * 0.7 + distanceToAlly * 0.3;
+        const distanceToCastle = Phaser.Math.Distance.Between(
+          enemy.x,
+          enemy.y,
+          this.castleGatePoint.x,
+          this.castleGatePoint.y
+        );
+
+        score = distanceToCastle * 0.65 + distanceToAlly * 0.35;
       }
 
-      if (enemy.isBoss) {
-        score -= 120;
-      }
-
-      if (enemy.isRanged) {
-        score -= 40;
-      }
+      if (enemy.isBoss) score -= 150;
+      if (enemy.isRanged) score -= 40;
 
       if (score < bestScore) {
         bestScore = score;
@@ -2100,13 +2347,14 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   updateHealerAlly(ally, time) {
-    const healRange = 190;
+    const healRange = 195;
     const searchRange = 760;
 
     let target = null;
     let targetKind = "ally";
     let lowestHpPercent = 1;
 
+    // Heal weakest allied unit first.
     this.allies.children.iterate((other) => {
       if (!other || !other.active || other === ally) return;
       if (other.hp === undefined || other.maxHp === undefined) return;
@@ -2116,24 +2364,25 @@ export default class WorldScene extends Phaser.Scene {
 
       const hpPercent = other.hp / other.maxHp;
 
-      if (hpPercent < lowestHpPercent && hpPercent < 0.96) {
+      if (hpPercent < lowestHpPercent && hpPercent < 0.97) {
         lowestHpPercent = hpPercent;
         target = other;
         targetKind = "ally";
       }
     });
 
+    // Heal player if player is weak enough.
     const playerHpPercent = this.playerStats.hp / this.playerStats.maxHp;
     const playerDistance = Phaser.Math.Distance.Between(ally.x, ally.y, this.player.x, this.player.y);
 
-    if ((!target || playerHpPercent < lowestHpPercent) && playerHpPercent < 0.92 && playerDistance < searchRange) {
+    if ((!target || playerHpPercent < lowestHpPercent) && playerHpPercent < 0.93 && playerDistance < searchRange) {
       target = this.player;
       targetKind = "player";
       lowestHpPercent = playerHpPercent;
     }
 
     if (!target) {
-      this.freeAllyWander(ally, time);
+      this.moveAllyToFormation(ally, time);
       return;
     }
 
@@ -2141,14 +2390,14 @@ export default class WorldScene extends Phaser.Scene {
 
     if (distance > healRange) {
       if (time > ally.nextMoveDecision) {
-        ally.nextMoveDecision = time + 300;
+        ally.nextMoveDecision = time + 280;
         this.physics.moveTo(ally, target.x, target.y, ally.speed || 58);
       }
     } else {
       ally.body.setVelocity(0);
     }
 
-    if (distance <= healRange && time - ally.lastHeal > 950) {
+    if (distance <= healRange && time - ally.lastHeal > 900) {
       ally.lastHeal = time;
       ally.body.setVelocity(0);
 
@@ -2157,7 +2406,7 @@ export default class WorldScene extends Phaser.Scene {
         this.playerStats.hp = Math.min(this.playerStats.maxHp, this.playerStats.hp + healAmount);
         this.showFloatingText(this.player.x, this.player.y - 55, `+${healAmount} HP`, "#22c55e");
       } else {
-        const healAmount = 26;
+        const healAmount = 28;
         target.hp = Math.min(target.maxHp, target.hp + healAmount);
         this.updateAllyHealthBar?.(target);
         this.showFloatingText(target.x, target.y - 55, `+${healAmount} HP`, "#22c55e");
@@ -2170,25 +2419,27 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   updateKnightAlly(ally, enemy, distance, time) {
-    const stopDistance = 62;
+    const stopDistance = 64;
 
     if (distance > stopDistance) {
       if (time > ally.nextMoveDecision) {
-        ally.nextMoveDecision = time + 220;
-        this.physics.moveTo(ally, enemy.x, enemy.y, ally.speed || 72);
+        ally.nextMoveDecision = time + 190;
+        this.physics.moveTo(ally, enemy.x, enemy.y, ally.speed || 74);
       }
     } else {
       ally.body.setVelocity(0);
     }
 
-    if (distance < 78 && time - ally.lastAttack > 800) {
+    if (distance < 82 && time - ally.lastAttack > 760) {
       ally.lastAttack = time;
       ally.body.setVelocity(0);
 
       this.playUnitAttackAnimation?.(ally);
 
-      enemy.hp -= ally.damage || 13;
-      this.showDamage(enemy.x, enemy.y, ally.damage || 13, "#93c5fd");
+      const damage = ally.damage || 14;
+      enemy.hp -= damage;
+
+      this.showDamage(enemy.x, enemy.y, damage, "#93c5fd");
       this.updateEnemyHealthBar?.(enemy);
 
       if (enemy.hp <= 0) this.killEnemy(enemy);
@@ -2196,10 +2447,10 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   updateArcherAlly(ally, enemy, distance, time) {
-    const dangerDistance = 125;
-    const shootRange = ally.range || 620;
-    const moveCloserDistance = shootRange * 0.92;
+    const dangerDistance = ally.role === "castleArcher" ? 75 : 125;
+    const shootRange = ally.range || 650;
 
+    // Back away if enemy reaches archer.
     if (distance < dangerDistance) {
       if (time > ally.nextMoveDecision) {
         ally.nextMoveDecision = time + 420;
@@ -2210,19 +2461,18 @@ export default class WorldScene extends Phaser.Scene {
 
         this.physics.moveTo(ally, fleeX, fleeY, ally.speed || 52);
       }
-    } else if (distance > moveCloserDistance) {
-      if (time > ally.nextMoveDecision) {
-        ally.nextMoveDecision = time + 500;
-        this.physics.moveTo(ally, enemy.x, enemy.y, (ally.speed || 52) * 0.5);
-      }
     } else {
-      ally.body.setVelocity(0);
+      this.moveAllyToFormation(ally, time);
     }
 
-    if (distance <= shootRange && time - ally.lastAttack > 850) {
+    if (distance <= shootRange && time - ally.lastAttack > 760) {
       ally.lastAttack = time;
+
+      // Stop briefly to shoot, then continue formation movement next update.
       ally.body.setVelocity(0);
-      this.shootProjectile(ally, enemy, ally.damage || 13, 0xfacc15);
+
+      const damage = ally.damage || 13;
+      this.shootProjectile(ally, enemy, damage, ally.role === "castleArcher" ? 0xf59e0b : 0xfacc15);
     }
   }
 
