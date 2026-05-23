@@ -2017,200 +2017,211 @@ export default class WorldScene extends Phaser.Scene {
     this.allies.children.iterate((ally) => {
       if (!ally || !ally.active) return;
 
-      this.updateAllyHealthBar(ally);
+      this.updateAllyHealthBar?.(ally);
 
       if (ally.role === "healer") {
         this.updateHealerAlly(ally, time);
         return;
       }
 
-      if (!ally.currentTarget || !ally.currentTarget.active || time > ally.nextTargetCheck) {
-        const nearest = this.getNearestEnemy(ally);
-        ally.currentTarget = nearest?.enemy ?? null;
-        ally.nextTargetCheck = time + 350;
-      }
+      if (ally.role === "castleArcher") {
+        const target = this.getNearestEnemyForAlly(ally, ally.range || 700);
 
-      const enemy = ally.currentTarget;
+        ally.body.setVelocity(0);
 
-      if (!enemy || !enemy.active) {
-        if (ally.role === "castleArcher") {
-          ally.body.setVelocity(0);
-        } else {
-          this.freeAllyWander(ally, time);
+        if (target && time - ally.lastAttack > 950) {
+          ally.lastAttack = time;
+          ally.currentTarget = target;
+          this.shootProjectile(ally, target, ally.damage, 0xfacc15);
         }
+
         return;
       }
 
-      const distance = Phaser.Math.Distance.Between(ally.x, ally.y, enemy.x, enemy.y);
+      if (ally.role === "archer") {
+        const target = this.getNearestEnemyForAlly(ally, ally.range || 420);
 
-      if (distance > ally.range) {
-        ally.currentTarget = null;
-
-        if (ally.role === "castleArcher") {
-          ally.body.setVelocity(0);
-        } else {
+        if (!target) {
           this.freeAllyWander(ally, time);
+          return;
         }
+
+        const distance = Phaser.Math.Distance.Between(ally.x, ally.y, target.x, target.y);
+        this.updateArcherAlly(ally, target, distance, time);
         return;
       }
 
-      if (ally.role === "knight") {
-        this.updateKnightAlly(ally, enemy, distance, time);
+      // Knights
+      const target = this.getNearestEnemyForAlly(ally, ally.range || 180);
+
+      if (!target) {
+        this.freeAllyWander(ally, time);
+        return;
       }
 
-      if (ally.role === "archer" || ally.role === "castleArcher") {
-        this.updateArcherAlly(ally, enemy, distance, time);
-      }
+      const distance = Phaser.Math.Distance.Between(ally.x, ally.y, target.x, target.y);
+      this.updateKnightAlly(ally, target, distance, time);
     });
   }
 
-  updateHealerAlly(ally, time) {
-    let target = null;
-    let lowestScore = 1;
+  getNearestEnemyForAlly(ally, maxRange = 420) {
+    if (!this.enemies) return null;
 
-    this.allies.children.iterate((other) => {
-      if (!other || !other.active || other === ally) return;
+    let bestEnemy = null;
+    let bestDistance = Infinity;
 
-      const distance = Phaser.Math.Distance.Between(ally.x, ally.y, other.x, other.y);
-      if (distance > 300) return;
+    this.enemies.children.iterate((enemy) => {
+      if (!enemy || !enemy.active) return;
 
-      const hpPercent = other.hp / other.maxHp;
+      const distance = Phaser.Math.Distance.Between(ally.x, ally.y, enemy.x, enemy.y);
 
-      if (hpPercent < lowestScore) {
-        lowestScore = hpPercent;
-        target = other;
+      if (distance < bestDistance && distance <= maxRange) {
+        bestEnemy = enemy;
+        bestDistance = distance;
       }
     });
 
-    const playerPercent = this.playerStats.hp / this.playerStats.maxHp;
+    return bestEnemy;
+  }
+
+  updateHealerAlly(ally, time) {
+    const healRange = 165;
+    const searchRange = 620;
+
+    let target = null;
+    let targetKind = "ally";
+    let lowestHpPercent = 1;
+
+    // 1. Heal weakest ally first.
+    this.allies.children.iterate((other) => {
+      if (!other || !other.active || other === ally) return;
+      if (other.hp === undefined || other.maxHp === undefined) return;
+
+      const distance = Phaser.Math.Distance.Between(ally.x, ally.y, other.x, other.y);
+      if (distance > searchRange) return;
+
+      const hpPercent = other.hp / other.maxHp;
+
+      if (hpPercent < lowestHpPercent && hpPercent < 0.92) {
+        lowestHpPercent = hpPercent;
+        target = other;
+        targetKind = "ally";
+      }
+    });
+
+    // 2. Heal player if no weaker ally needs healing.
+    const playerHpPercent = this.playerStats.hp / this.playerStats.maxHp;
     const playerDistance = Phaser.Math.Distance.Between(ally.x, ally.y, this.player.x, this.player.y);
 
-    if (!target && playerPercent < 0.85 && playerDistance < 300) {
-      target = "player";
-      lowestScore = playerPercent;
+    if (!target && playerHpPercent < 0.9 && playerDistance < searchRange) {
+      target = this.player;
+      targetKind = "player";
+      lowestHpPercent = playerHpPercent;
     }
 
+    // 3. If nobody needs healing, stay useful but avoid standing still forever.
     if (!target) {
       this.freeAllyWander(ally, time);
       return;
     }
 
-    const targetX = target === "player" ? this.player.x : target.x;
-    const targetY = target === "player" ? this.player.y : target.y;
+    const targetX = target.x;
+    const targetY = target.y;
     const distance = Phaser.Math.Distance.Between(ally.x, ally.y, targetX, targetY);
 
-    if (distance > 95) {
+    if (distance > healRange) {
       if (time > ally.nextMoveDecision) {
-        ally.nextMoveDecision = time + 450;
-        this.physics.moveTo(ally, targetX, targetY, ally.speed);
+        ally.nextMoveDecision = time + 350;
+        this.physics.moveTo(ally, targetX, targetY, ally.speed || 45);
       }
     } else {
       ally.body.setVelocity(0);
     }
 
-    if (distance < 130 && time - ally.lastHeal > 1250) {
+    if (distance <= healRange && time - ally.lastHeal > 1150) {
       ally.lastHeal = time;
+      ally.body.setVelocity(0);
 
-      if (target === "player") {
-        this.playerStats.hp = Math.min(this.playerStats.maxHp, this.playerStats.hp + 14);
-        this.showFloatingText(this.player.x, this.player.y - 50, "+14 HP", "#22c55e");
+      if (targetKind === "player") {
+        const healAmount = 16;
+        this.playerStats.hp = Math.min(this.playerStats.maxHp, this.playerStats.hp + healAmount);
+        this.showFloatingText(this.player.x, this.player.y - 55, `+${healAmount} HP`, "#22c55e");
       } else {
-        target.hp = Math.min(target.maxHp, target.hp + 18);
-        this.updateAllyHealthBar(target);
-        this.showFloatingText(target.x, target.y - 50, "+18 HP", "#22c55e");
+        const healAmount = 22;
+        target.hp = Math.min(target.maxHp, target.hp + healAmount);
+        this.updateAllyHealthBar?.(target);
+        this.showFloatingText(target.x, target.y - 55, `+${healAmount} HP`, "#22c55e");
       }
 
-      this.drawHealPulse(ally.x, ally.y);
-      this.playUnitAttackAnimation(ally);
-      this.playSound("heal");
+      this.drawHealPulse?.(ally.x, ally.y);
+      this.playUnitAttackAnimation?.(ally);
+      this.playSound?.("heal");
     }
   }
 
-
   updateKnightAlly(ally, enemy, distance, time) {
-    const stopDistance = 58;
+    const stopDistance = 62;
 
     if (distance > stopDistance) {
       if (time > ally.nextMoveDecision) {
         ally.nextMoveDecision = time + 220;
-        this.physics.moveTo(ally, enemy.x, enemy.y, ally.speed);
+        this.physics.moveTo(ally, enemy.x, enemy.y, ally.speed || 70);
       }
     } else {
       ally.body.setVelocity(0);
     }
 
-    if (distance < 72 && time - ally.lastAttack > 950) {
+    if (distance < 78 && time - ally.lastAttack > 850) {
       ally.lastAttack = time;
       ally.body.setVelocity(0);
 
-      this.animateMeleeAttack(ally);
+      this.playUnitAttackAnimation?.(ally);
+
       enemy.hp -= ally.damage;
       this.showDamage(enemy.x, enemy.y, ally.damage, "#93c5fd");
-
-      this.tweens.add({
-        targets: ally.bodyShape,
-        scaleX: 1.18,
-        scaleY: 1.18,
-        yoyo: true,
-        duration: 90,
-      });
+      this.updateEnemyHealthBar?.(enemy);
 
       if (enemy.hp <= 0) this.killEnemy(enemy);
     }
   }
 
   updateArcherAlly(ally, enemy, distance, time) {
-    if (ally.role === "castleArcher") {
-      ally.body.setVelocity(0);
+    const dangerDistance = 135;
+    const idealMin = 210;
+    const idealMax = ally.range || 420;
 
-      if (distance < ally.range && time - ally.lastAttack > 1150) {
-        ally.lastAttack = time;
-        this.shootProjectile(ally, enemy, ally.damage, 0xfacc15);
-      }
-
-      return;
-    }
-
-    const dangerDistance = 145;
-    const goodMin = 190;
-    const goodMax = 295;
-
+    // If enemy is too close, back away.
     if (distance < dangerDistance) {
       if (time > ally.nextMoveDecision) {
         ally.nextMoveDecision = time + 450;
 
         const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, ally.x, ally.y);
-        ally.wanderX = Phaser.Math.Clamp(ally.x + Math.cos(angle) * 120, 40, this.worldW - 40);
-        ally.wanderY = Phaser.Math.Clamp(ally.y + Math.sin(angle) * 120, 40, this.worldH - 40);
+        const fleeX = Phaser.Math.Clamp(ally.x + Math.cos(angle) * 120, 40, this.worldW - 40);
+        const fleeY = Phaser.Math.Clamp(ally.y + Math.sin(angle) * 120, 40, this.worldH - 40);
 
-        this.physics.moveTo(ally, ally.wanderX, ally.wanderY, ally.speed);
+        this.physics.moveTo(ally, fleeX, fleeY, ally.speed || 45);
       }
-    } else if (distance > goodMax) {
+    }
+
+    // If enemy is too far but still visible, move closer slowly.
+    else if (distance > idealMax * 0.85) {
       if (time > ally.nextMoveDecision) {
-        ally.nextMoveDecision = time + 450;
-        this.physics.moveTo(ally, enemy.x, enemy.y, ally.speed * 0.45);
+        ally.nextMoveDecision = time + 500;
+        this.physics.moveTo(ally, enemy.x, enemy.y, (ally.speed || 45) * 0.55);
       }
-    } else {
+    }
+
+    // If enemy is in good range, stop and shoot.
+    else {
       ally.body.setVelocity(0);
     }
 
-    if (distance < ally.range && time - ally.lastAttack > 1450) {
+    if (distance <= idealMax && time - ally.lastAttack > 1050) {
       ally.lastAttack = time;
       ally.body.setVelocity(0);
+
       this.shootProjectile(ally, enemy, ally.damage, 0xfacc15);
     }
-  }
-
-  drawHealPulse(x, y) {
-    const pulse = this.add.circle(x, y, 18, 0x22c55e, 0.22);
-
-    this.tweens.add({
-      targets: pulse,
-      scale: 2.2,
-      alpha: 0,
-      duration: 500,
-      onComplete: () => pulse.destroy(),
-    });
   }
 
 
