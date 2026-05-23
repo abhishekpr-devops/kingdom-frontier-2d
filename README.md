@@ -4,6 +4,10 @@ Kingdom Frontier 2D is a browser-based 2D castle defense game built with React, 
 
 ## Live Demo
 
+Cloudflare Pages:
+https://kingdom-frontier-2d.abhishek1623la.workers.dev
+
+Netlify:
 https://kingdom-frontier-2d.netlify.app
 
 ## GitHub Repository
@@ -53,6 +57,7 @@ https://github.com/abhishekpr-devops/kingdom-frontier-2d
 - Phaser
 - JavaScript
 - CSS
+- Cloudflare Pages
 - Netlify
 - GitHub
 
