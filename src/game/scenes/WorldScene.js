@@ -4404,9 +4404,29 @@ export default class WorldScene extends Phaser.Scene {
   }
 
 
+  fixStaminaNaN() {
+    if (!this.playerStats) return;
+
+    const safeNumber = (value, fallback) => {
+      const numberValue = Number(value);
+      return Number.isFinite(numberValue) ? numberValue : fallback;
+    };
+
+    this.playerStats.maxStamina = safeNumber(this.playerStats.maxStamina, 100);
+    this.playerStats.stamina = safeNumber(this.playerStats.stamina, this.playerStats.maxStamina);
+
+    this.playerStats.maxStamina = Math.max(1, this.playerStats.maxStamina);
+    this.playerStats.stamina = Phaser.Math.Clamp(
+      this.playerStats.stamina,
+      0,
+      this.playerStats.maxStamina
+    );
+  }
+
   updateUI() {
+    this.fixStaminaNaN?.();
     this.goldText.setText(
-      `HP:${Math.floor(this.playerStats.hp)}/${this.playerStats.maxHp}  ST:${Math.floor(this.playerStats.stamina)}  Gold:${this.playerStats.gold}  XP:${this.playerStats.xp}  Lv:${this.playerStats.level}  Wave:${this.wave}`
+      `HP:${Math.floor(this.playerStats.hp)}/${this.playerStats.maxHp}  ST:${Math.floor(Number.isFinite(Number(this.playerStats.stamina)) ? Number(this.playerStats.stamina) : 100)}  Gold:${this.playerStats.gold}  XP:${this.playerStats.xp}  Lv:${this.playerStats.level}  Wave:${this.wave}`
     );
 
     this.castleHpText.setText(
