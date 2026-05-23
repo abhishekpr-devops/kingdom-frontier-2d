@@ -43,6 +43,7 @@ export default class WorldScene extends Phaser.Scene {
     this.questOpen = false;
     this.upgradeOpen = false;
     this.upgradeCardOpen = false;
+    this.formationMode = "follow";
     this.waveActive = false;
     this.currentUpgradeCards = [];
     this.isPaused = false;
@@ -1025,6 +1026,7 @@ export default class WorldScene extends Phaser.Scene {
       P: Phaser.Input.Keyboard.KeyCodes.P,
       L: Phaser.Input.Keyboard.KeyCodes.L,
       H: Phaser.Input.Keyboard.KeyCodes.H,
+      F: Phaser.Input.Keyboard.KeyCodes.F,
       Q: Phaser.Input.Keyboard.KeyCodes.Q,
       ESC: Phaser.Input.Keyboard.KeyCodes.ESC,
       ONE: Phaser.Input.Keyboard.KeyCodes.ONE,
@@ -1302,6 +1304,7 @@ export default class WorldScene extends Phaser.Scene {
       {
         title: "Knight Vanguard",
         desc: "All knights: +4 damage, +25 HP",
+        rarity: "COMMON",
         apply: () => {
           this.allies.children.iterate((ally) => {
             if (!ally || !ally.active) return;
@@ -1316,6 +1319,7 @@ export default class WorldScene extends Phaser.Scene {
       {
         title: "Archer Volley",
         desc: "Archers: +4 damage, +160 range",
+        rarity: "COMMON",
         apply: () => {
           this.allies.children.iterate((ally) => {
             if (!ally || !ally.active) return;
@@ -1324,11 +1328,14 @@ export default class WorldScene extends Phaser.Scene {
               ally.range += 160;
             }
           });
+
+          this.applyCastleArcherVisualUpgrade();
         },
       },
       {
         title: "Healer Blessing",
         desc: "Healer: faster movement, stronger healing",
+        rarity: "COMMON",
         apply: () => {
           this.allies.children.iterate((ally) => {
             if (!ally || !ally.active) return;
@@ -1346,6 +1353,7 @@ export default class WorldScene extends Phaser.Scene {
       {
         title: "Castle Guard",
         desc: "Castle: +120 HP and repair 120",
+        rarity: "COMMON",
         apply: () => {
           this.maxCastleHealth += 120;
           this.castleHealth = Math.min(this.maxCastleHealth, this.castleHealth + 120);
@@ -1355,6 +1363,7 @@ export default class WorldScene extends Phaser.Scene {
       {
         title: "Hero Training",
         desc: "Player: +6 damage, +20 max HP",
+        rarity: "COMMON",
         apply: () => {
           this.playerStats.damage += 6;
           this.playerStats.maxHp += 20;
@@ -1364,9 +1373,29 @@ export default class WorldScene extends Phaser.Scene {
       {
         title: "Battle Supplies",
         desc: "+90 gold and +2 potions",
+        rarity: "COMMON",
         apply: () => {
           this.playerStats.gold += 90;
           this.playerStats.potions += 2;
+        },
+      },
+      {
+        title: "Tower Mastery",
+        desc: "Castle Archer: stronger tower and faster shots",
+        rarity: "RARE",
+        apply: () => {
+          this.allies.children.iterate((ally) => {
+            if (!ally || !ally.active) return;
+            if (ally.role === "castleArcher") {
+              ally.damage += 8;
+              ally.range += 220;
+              ally.maxHp += 40;
+              ally.hp = ally.maxHp;
+            }
+          });
+
+          this.playerStats.castleArcherLevel = (this.playerStats.castleArcherLevel || 1) + 1;
+          this.applyCastleArcherVisualUpgrade();
         },
       },
     ];
@@ -1379,7 +1408,7 @@ export default class WorldScene extends Phaser.Scene {
     overlay.setScrollFactor(0);
     overlay.setDepth(30000);
 
-    const title = this.add.text(480, 115, `Wave ${this.wave} cleared. Choose an upgrade`, {
+    const title = this.add.text(480, 100, `Wave ${this.wave} cleared. Choose one upgrade`, {
       fontSize: "24px",
       color: "#facc15",
       fontFamily: "monospace",
@@ -1394,32 +1423,57 @@ export default class WorldScene extends Phaser.Scene {
 
     this.currentUpgradeCards.forEach((card, index) => {
       const x = 245 + index * 235;
-      const panel = this.add.rectangle(x, 285, 205, 230, 0x111827, 0.96);
+
+      const panel = this.add.rectangle(x, 285, 205, 235, 0x111827, 0.97);
+      panel.setStrokeStyle(3, card.rarity === "RARE" ? 0xfacc15 : 0x93c5fd, 0.9);
       panel.setScrollFactor(0);
       panel.setDepth(30001);
+      panel.setInteractive({ useHandCursor: true });
 
       const cardText = this.add.text(x, 285, [
         `${index + 1}`,
+        card.rarity,
         "",
         card.title,
         "",
         card.desc,
+        "",
+        "Click or press key",
       ].join("\n"), {
-        fontSize: "15px",
+        fontSize: "14px",
         color: "#ffffff",
         fontFamily: "monospace",
         align: "center",
-        lineSpacing: 6,
+        lineSpacing: 5,
         wordWrap: { width: 175 },
       });
       cardText.setOrigin(0.5);
       cardText.setScrollFactor(0);
       cardText.setDepth(30002);
 
+      panel.on("pointerover", () => {
+        panel.setFillStyle(0x1e293b, 0.98);
+        panel.setScale(1.04);
+      });
+
+      panel.on("pointerout", () => {
+        panel.setFillStyle(0x111827, 0.97);
+        panel.setScale(1);
+      });
+
+      panel.on("pointerdown", () => {
+        this.chooseWaveUpgrade(index);
+      });
+
+      cardText.setInteractive({ useHandCursor: true });
+      cardText.on("pointerdown", () => {
+        this.chooseWaveUpgrade(index);
+      });
+
       this.upgradeCardObjects.push(panel, cardText);
     });
 
-    const help = this.add.text(480, 445, "Press 1, 2, or 3 to choose", {
+    const help = this.add.text(480, 445, "Click a card or press 1, 2, or 3", {
       fontSize: "16px",
       color: "#93c5fd",
       fontFamily: "monospace",
@@ -1431,6 +1485,7 @@ export default class WorldScene extends Phaser.Scene {
 
     this.upgradeCardObjects.push(help);
   }
+
 
   chooseWaveUpgrade(index) {
     if (!this.upgradeCardOpen) return;
@@ -1457,11 +1512,94 @@ export default class WorldScene extends Phaser.Scene {
     this.updateQuestProgress?.("survive3", this.wave);
     this.updateUI?.();
 
-    this.time.delayedCall(800, () => {
+    this.showWavePreview();
+
+    this.time.delayedCall(1900, () => {
+      this.hideWavePreview();
       this.waveCooldown = false;
       this.spawnWave();
     });
   }
+
+  showWavePreview() {
+    this.hideWavePreview();
+
+    const nextWave = this.wave;
+    const isBossWave = nextWave % 5 === 0;
+
+    const enemies = isBossWave
+      ? ["Troll Boss", "Orc Warrior", "Orc Archer"]
+      : nextWave >= 4
+        ? ["Goblin", "Orc Warrior", "Orc Archer", "Armored Orc"]
+        : ["Goblin", "Orc Warrior", "Orc Archer"];
+
+    this.wavePreviewObjects = [];
+
+    const panel = this.add.rectangle(480, 92, 560, 96, 0x111827, 0.94);
+    panel.setScrollFactor(0);
+    panel.setDepth(31000);
+
+    const text = this.add.text(480, 92, [
+      `NEXT WAVE ${nextWave}`,
+      isBossWave ? "Boss wave incoming" : "Enemy types incoming",
+      enemies.join("  |  "),
+    ].join("\n"), {
+      fontSize: "16px",
+      color: isBossWave ? "#f87171" : "#facc15",
+      fontFamily: "monospace",
+      align: "center",
+      lineSpacing: 5,
+    });
+    text.setOrigin(0.5);
+    text.setScrollFactor(0);
+    text.setDepth(31001);
+
+    this.wavePreviewObjects.push(panel, text);
+    this.playSound?.(isBossWave ? "boss" : "wave");
+  }
+
+  hideWavePreview() {
+    if (!this.wavePreviewObjects) return;
+
+    this.wavePreviewObjects.forEach((obj) => {
+      if (obj && obj.destroy) obj.destroy();
+    });
+
+    this.wavePreviewObjects = [];
+  }
+
+  applyCastleArcherVisualUpgrade() {
+    const level = this.playerStats.castleArcherLevel || 1;
+
+    this.allies.children.iterate((ally) => {
+      if (!ally || !ally.active) return;
+      if (ally.role !== "castleArcher") return;
+
+      const gold = 0xfacc15;
+      const blue = 0x2563eb;
+
+      if (ally.wallTop) {
+        ally.wallTop.setFillStyle(level >= 3 ? gold : 0xcbd5e1);
+      }
+
+      if (ally.wall) {
+        ally.wall.setFillStyle(level >= 2 ? 0x64748b : 0x94a3b8);
+      }
+
+      if (ally.flag) {
+        ally.flag.setFillStyle(level >= 2 ? gold : blue);
+      }
+
+      if (!ally.upgradeStar) {
+        ally.upgradeStar = this.add.star(0, -48, 5, 5, 11, gold, 0.95);
+        ally.add(ally.upgradeStar);
+      }
+
+      ally.upgradeStar.setVisible(level >= 2);
+      ally.upgradeStar.setScale(level >= 4 ? 1.35 : 1);
+    });
+  }
+
 
   spawnWave() {
     if (this.upgradeCardOpen) return;
@@ -1872,6 +2010,7 @@ export default class WorldScene extends Phaser.Scene {
     this.resolveUnitOverlap();
     this.updateUnitWalkBob(time);
     this.updateLabels();
+    this.updateCleanUnitLabels();
     this.updateUI();
     this.updateMinimap();
 
@@ -1907,6 +2046,10 @@ export default class WorldScene extends Phaser.Scene {
       if (Phaser.Input.Keyboard.JustDown(this.keys.TWO)) this.chooseWaveUpgrade(1);
       if (Phaser.Input.Keyboard.JustDown(this.keys.THREE)) this.chooseWaveUpgrade(2);
       return;
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.keys.F)) {
+      this.toggleFormationMode();
     }
 
 
@@ -2204,6 +2347,30 @@ export default class WorldScene extends Phaser.Scene {
     }
   }
 
+  toggleFormationMode() {
+    this.formationMode = this.formationMode === "follow" ? "hold" : "follow";
+
+    if (this.formationMode === "hold") {
+      this.allies.children.iterate((ally) => {
+        if (!ally || !ally.active) return;
+        if (ally.role === "castleArcher") return;
+
+        ally.holdX = ally.x;
+        ally.holdY = ally.y;
+      });
+
+      this.showMessage("Formation: HOLD POSITION");
+    } else {
+      this.allies.children.iterate((ally) => {
+        if (!ally || !ally.active) return;
+        ally.holdX = null;
+        ally.holdY = null;
+      });
+
+      this.showMessage("Formation: FOLLOW PLAYER");
+    }
+  }
+
   updateAllies(time) {
     const roleCounts = {
       knight: 0,
@@ -2279,11 +2446,7 @@ export default class WorldScene extends Phaser.Scene {
 
 
   getAllyFormationSlot(ally, slotIndex = 0) {
-    const px = this.player.x;
-    const py = this.player.y;
-
-    // Castle Archer is fixed on castle wall.
-    // This return is only a safety fallback.
+    // Castle Archer is fixed on the castle wall.
     if (ally.role === "castleArcher") {
       return {
         x: ally.fixedX ?? ally.homeX ?? ally.x,
@@ -2291,43 +2454,66 @@ export default class WorldScene extends Phaser.Scene {
       };
     }
 
-    // V0.30 party formation:
-    // All mobile allies stay behind the player with clear spacing.
-    const rowGap = 82;
-    const colGap = 72;
+    const followBaseX = this.player.x;
+    const followBaseY = this.player.y;
+
+    // Hold mode uses the ally's saved hold position as the formation base.
+    const baseX = this.formationMode === "hold" && ally.holdX ? ally.holdX : followBaseX;
+    const baseY = this.formationMode === "hold" && ally.holdY ? ally.holdY : followBaseY;
+
+    const rowGap = 86;
+    const colGap = 78;
 
     if (ally.role === "knight") {
-      const slots = [
-        { x: px - rowGap, y: py - colGap },
-        { x: px - rowGap, y: py + colGap },
-        { x: px - rowGap * 1.45, y: py },
-      ];
+      const slots = this.formationMode === "hold"
+        ? [
+            { x: baseX + 45, y: baseY - 45 },
+            { x: baseX + 45, y: baseY + 45 },
+            { x: baseX + 105, y: baseY },
+          ]
+        : [
+            { x: baseX - rowGap, y: baseY - colGap },
+            { x: baseX - rowGap, y: baseY + colGap },
+            { x: baseX - rowGap * 1.55, y: baseY },
+          ];
 
       return slots[slotIndex % slots.length];
     }
 
     if (ally.role === "healer") {
-      const slots = [
-        { x: px - rowGap * 2.1, y: py },
-        { x: px - rowGap * 2.25, y: py - colGap },
-        { x: px - rowGap * 2.25, y: py + colGap },
-      ];
+      const slots = this.formationMode === "hold"
+        ? [
+            { x: baseX - 25, y: baseY },
+            { x: baseX - 60, y: baseY - 55 },
+            { x: baseX - 60, y: baseY + 55 },
+          ]
+        : [
+            { x: baseX - rowGap * 2.25, y: baseY },
+            { x: baseX - rowGap * 2.4, y: baseY - colGap },
+            { x: baseX - rowGap * 2.4, y: baseY + colGap },
+          ];
 
       return slots[slotIndex % slots.length];
     }
 
     if (ally.role === "archer") {
-      const slots = [
-        { x: px - rowGap * 2.9, y: py - colGap * 1.35 },
-        { x: px - rowGap * 2.9, y: py + colGap * 1.35 },
-        { x: px - rowGap * 3.6, y: py - colGap * 0.45 },
-        { x: px - rowGap * 3.6, y: py + colGap * 0.45 },
-      ];
+      const slots = this.formationMode === "hold"
+        ? [
+            { x: baseX - 125, y: baseY - 110 },
+            { x: baseX - 125, y: baseY + 110 },
+            { x: baseX - 190, y: baseY },
+          ]
+        : [
+            { x: baseX - rowGap * 3.05, y: baseY - colGap * 1.45 },
+            { x: baseX - rowGap * 3.05, y: baseY + colGap * 1.45 },
+            { x: baseX - rowGap * 3.8, y: baseY - colGap * 0.55 },
+            { x: baseX - rowGap * 3.8, y: baseY + colGap * 0.55 },
+          ];
 
       return slots[slotIndex % slots.length];
     }
 
-    return { x: px - rowGap * 2.5, y: py };
+    return { x: baseX - rowGap * 2.5, y: baseY };
   }
 
 
@@ -3481,6 +3667,7 @@ export default class WorldScene extends Phaser.Scene {
         }
       });
 
+      this.applyCastleArcherVisualUpgrade();
       this.showMessage(`Castle Archer tower upgraded to Lv ${this.playerStats.castleArcherLevel}.`);
     }
 
@@ -4014,6 +4201,59 @@ export default class WorldScene extends Phaser.Scene {
     });
   }
 
+  updateCleanUnitLabels() {
+    if (this.playerLabel && this.player) {
+      this.playerLabel.x = this.player.x - 46;
+      this.playerLabel.y = this.player.y - 82;
+    }
+
+    const roleSlots = {
+      knight: 0,
+      archer: 0,
+      healer: 0,
+      castleArcher: 0,
+      other: 0,
+    };
+
+    if (this.allies) {
+      this.allies.children.iterate((ally) => {
+        if (!ally || !ally.active || !ally.nameLabel) return;
+
+        const role = ally.role || "other";
+        const slot = roleSlots[role] ?? 0;
+        roleSlots[role] = slot + 1;
+
+        const offsets = {
+          knight: { x: -42 + (slot % 2) * 16, y: -78 - Math.floor(slot / 2) * 14 },
+          archer: { x: -45 + (slot % 2) * 18, y: -84 - Math.floor(slot / 2) * 14 },
+          healer: { x: -34, y: -86 - slot * 14 },
+          castleArcher: { x: -48, y: -82 - slot * 14 },
+          other: { x: -38, y: -76 - slot * 14 },
+        };
+
+        const off = offsets[role] || offsets.other;
+        ally.nameLabel.x = ally.x + off.x;
+        ally.nameLabel.y = ally.y + off.y;
+
+        ally.nameLabel.setDepth(9000);
+      });
+    }
+
+    if (this.enemies) {
+      let enemySlot = 0;
+
+      this.enemies.children.iterate((enemy) => {
+        if (!enemy || !enemy.active || !enemy.nameLabel) return;
+
+        const row = enemySlot % 3;
+        enemy.nameLabel.x = enemy.x - 45 + row * 12;
+        enemy.nameLabel.y = enemy.y - (enemy.isBoss ? 95 : 82) - Math.floor(enemySlot / 3) * 8;
+        enemy.nameLabel.setDepth(9000);
+        enemySlot += 1;
+      });
+    }
+  }
+
   updateLabels() {
     this.playerLabel.x = this.player.x - 22;
     this.playerLabel.y = this.player.y - 60;
@@ -4071,6 +4311,7 @@ export default class WorldScene extends Phaser.Scene {
         "X Delete save",
         "M Sound",
         "ESC Pause",
+        "F Formation",
         "H Hide",
       ].join("\n")
     );
