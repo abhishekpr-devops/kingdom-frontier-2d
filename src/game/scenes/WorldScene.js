@@ -2004,6 +2004,8 @@ export default class WorldScene extends Phaser.Scene {
     }
 
     this.movePlayer();
+    this.regeneratePlayerStamina();
+    this.updatePlayerAutoAttack(time);
     this.updateEnemies(time);
     this.updateAllies(time);
     this.handleWaveClearUpgradeCards(time);
@@ -2075,7 +2077,7 @@ export default class WorldScene extends Phaser.Scene {
       return;
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.keys.SPACE)) this.playerAttack(time);
+    if (Phaser.Input.Keyboard.JustDown(this.keys.SPACE)) this.playerSpecialAttack(time);
     if (Phaser.Input.Keyboard.JustDown(this.keys.E)) this.talkToNPC();
     if (Phaser.Input.Keyboard.JustDown(this.keys.U)) this.usePotion();
     if (Phaser.Input.Keyboard.JustDown(this.keys.R)) this.repairCastle();
@@ -2866,6 +2868,137 @@ export default class WorldScene extends Phaser.Scene {
         unit.destroy();
       },
     });
+  }
+
+  regeneratePlayerStamina() {
+    if (!this.playerStats) return;
+
+    const maxStamina = 100;
+    const regen = this.playerStats.stamina < 35 ? 0.16 : 0.09;
+
+    this.playerStats.stamina = Math.min(maxStamina, this.playerStats.stamina + regen);
+  }
+
+  updatePlayerAutoAttack(time) {
+    if (this.gameEnded || this.mainMenuOpen || this.isPaused || this.upgradeCardOpen) return;
+    if (!this.player || !this.enemies) return;
+
+    const cooldown = 560;
+    if (time - this.lastAutoAttackTime < cooldown) return;
+
+    const enemy = this.getNearestEnemyToPlayer(this.autoAttackRange);
+    if (!enemy) return;
+
+    this.lastAutoAttackTime = time;
+
+    const damage = Math.max(8, Math.floor(this.playerStats.damage * 0.75));
+
+    this.playUnitAttackAnimation?.(this.player);
+
+    enemy.hp -= damage;
+    this.showDamage(enemy.x, enemy.y, damage, "#facc15");
+    this.updateEnemyHealthBar?.(enemy);
+
+    if (enemy.hp <= 0) {
+      this.killEnemy(enemy);
+    }
+  }
+
+  getNearestEnemyToPlayer(maxRange = 120) {
+    let bestEnemy = null;
+    let bestDistance = Infinity;
+
+    this.enemies.children.iterate((enemy) => {
+      if (!enemy || !enemy.active) return;
+
+      const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y);
+
+      if (distance < bestDistance && distance <= maxRange) {
+        bestDistance = distance;
+        bestEnemy = enemy;
+      }
+    });
+
+    return bestEnemy;
+  }
+
+  playerSpecialAttack(time) {
+    if (this.gameEnded || this.mainMenuOpen || this.isPaused || this.upgradeCardOpen) return;
+
+    const cooldown = 900;
+
+    if (time - this.lastSpecialAttackTime < cooldown) {
+      this.showMessage("Special attack cooling down.");
+      return;
+    }
+
+    if (this.playerStats.stamina < this.specialAttackStaminaCost) {
+      this.showMessage(`Not enough stamina. Need ${this.specialAttackStaminaCost}.`);
+      return;
+    }
+
+    this.playerStats.stamina -= this.specialAttackStaminaCost;
+    this.lastSpecialAttackTime = time;
+
+    const range = this.specialAttackRange;
+    const damage = Math.floor(this.playerStats.damage * 1.55);
+
+    this.playUnitAttackAnimation?.(this.player);
+    this.playSound?.("attack");
+
+    const ring = this.add.circle(this.player.x, this.player.y, range, 0xfacc15, 0.16);
+    ring.setDepth(8500);
+
+    const slash = this.add.arc(this.player.x, this.player.y, range * 0.75, -35, 220, false, 0xfacc15, 0.58);
+    slash.setDepth(8501);
+
+    this.tweens.add({
+      targets: ring,
+      alpha: 0,
+      scale: 1.35,
+      duration: 260,
+      onComplete: () => ring.destroy(),
+    });
+
+    this.tweens.add({
+      targets: slash,
+      alpha: 0,
+      scale: 1.5,
+      duration: 210,
+      onComplete: () => slash.destroy(),
+    });
+
+    let hitCount = 0;
+
+    this.enemies.children.iterate((enemy) => {
+      if (!enemy || !enemy.active) return;
+
+      const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y);
+      if (distance > range) return;
+
+      hitCount += 1;
+
+      enemy.hp -= damage;
+      this.showDamage(enemy.x, enemy.y, damage, "#facc15");
+      this.updateEnemyHealthBar?.(enemy);
+
+      const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, enemy.x, enemy.y);
+      enemy.x += Math.cos(angle) * 28;
+      enemy.y += Math.sin(angle) * 28;
+
+      if (enemy.body) {
+        enemy.body.x = enemy.x - enemy.body.width / 2;
+        enemy.body.y = enemy.y - enemy.body.height / 2;
+      }
+
+      if (enemy.hp <= 0) {
+        this.killEnemy(enemy);
+      }
+    });
+
+    this.cameras.main.shake(120, 0.004);
+    this.showMessage(hitCount > 0 ? `Special attack hit ${hitCount} enemies.` : "Special attack missed.");
+    this.updateUI?.();
   }
 
   playerAttack(time) {
@@ -4298,7 +4431,7 @@ export default class WorldScene extends Phaser.Scene {
         "KEYS",
         "WASD Move",
         "Shift Run",
-        "Space Attack",
+        "Space Special Attack",
         "E Talk",
         "B Shop",
         "I Bag",
