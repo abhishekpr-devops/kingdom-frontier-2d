@@ -797,26 +797,26 @@ export default class WorldScene extends Phaser.Scene {
       },
       "Ally Archer": {
         color: 0x16a34a,
-        hp: 90,
-        damage: 9,
-        range: 330,
-        speed: 46,
+        hp: 95,
+        damage: 13,
+        range: 620,
+        speed: 52,
         role: "archer",
       },
       "Castle Archer": {
         color: 0xf59e0b,
-        hp: 110,
-        damage: 12,
-        range: 420,
+        hp: 120,
+        damage: 16,
+        range: 850,
         speed: 0,
         role: "castleArcher",
       },
       "Healer": {
         color: 0xf8fafc,
-        hp: 95,
+        hp: 120,
         damage: 0,
-        range: 230,
-        speed: 42,
+        range: 500,
+        speed: 58,
         role: "healer",
       },
     }[type];
@@ -2025,21 +2025,21 @@ export default class WorldScene extends Phaser.Scene {
       }
 
       if (ally.role === "castleArcher") {
-        const target = this.getNearestEnemyForAlly(ally, ally.range || 700);
-
         ally.body.setVelocity(0);
 
-        if (target && time - ally.lastAttack > 950) {
+        const target = this.getBestEnemyTargetForAlly(ally, ally.range || 850, true);
+
+        if (target && time - ally.lastAttack > 850) {
           ally.lastAttack = time;
           ally.currentTarget = target;
-          this.shootProjectile(ally, target, ally.damage, 0xfacc15);
+          this.shootProjectile(ally, target, ally.damage || 16, 0xfacc15);
         }
 
         return;
       }
 
       if (ally.role === "archer") {
-        const target = this.getNearestEnemyForAlly(ally, ally.range || 420);
+        const target = this.getBestEnemyTargetForAlly(ally, ally.range || 620, false);
 
         if (!target) {
           this.freeAllyWander(ally, time);
@@ -2051,8 +2051,7 @@ export default class WorldScene extends Phaser.Scene {
         return;
       }
 
-      // Knights
-      const target = this.getNearestEnemyForAlly(ally, ally.range || 180);
+      const target = this.getBestEnemyTargetForAlly(ally, ally.range || 180, false);
 
       if (!target) {
         this.freeAllyWander(ally, time);
@@ -2064,20 +2063,36 @@ export default class WorldScene extends Phaser.Scene {
     });
   }
 
-  getNearestEnemyForAlly(ally, maxRange = 420) {
+  getBestEnemyTargetForAlly(ally, maxRange = 620, preferCastleThreat = false) {
     if (!this.enemies) return null;
 
     let bestEnemy = null;
-    let bestDistance = Infinity;
+    let bestScore = Infinity;
 
     this.enemies.children.iterate((enemy) => {
       if (!enemy || !enemy.active) return;
 
-      const distance = Phaser.Math.Distance.Between(ally.x, ally.y, enemy.x, enemy.y);
+      const distanceToAlly = Phaser.Math.Distance.Between(ally.x, ally.y, enemy.x, enemy.y);
+      if (distanceToAlly > maxRange) return;
 
-      if (distance < bestDistance && distance <= maxRange) {
+      let score = distanceToAlly;
+
+      if (preferCastleThreat && this.castleGatePoint) {
+        const distanceToCastle = Phaser.Math.Distance.Between(enemy.x, enemy.y, this.castleGatePoint.x, this.castleGatePoint.y);
+        score = distanceToCastle * 0.7 + distanceToAlly * 0.3;
+      }
+
+      if (enemy.isBoss) {
+        score -= 120;
+      }
+
+      if (enemy.isRanged) {
+        score -= 40;
+      }
+
+      if (score < bestScore) {
+        bestScore = score;
         bestEnemy = enemy;
-        bestDistance = distance;
       }
     });
 
@@ -2085,14 +2100,13 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   updateHealerAlly(ally, time) {
-    const healRange = 165;
-    const searchRange = 620;
+    const healRange = 190;
+    const searchRange = 760;
 
     let target = null;
     let targetKind = "ally";
     let lowestHpPercent = 1;
 
-    // 1. Heal weakest ally first.
     this.allies.children.iterate((other) => {
       if (!other || !other.active || other === ally) return;
       if (other.hp === undefined || other.maxHp === undefined) return;
@@ -2102,52 +2116,48 @@ export default class WorldScene extends Phaser.Scene {
 
       const hpPercent = other.hp / other.maxHp;
 
-      if (hpPercent < lowestHpPercent && hpPercent < 0.92) {
+      if (hpPercent < lowestHpPercent && hpPercent < 0.96) {
         lowestHpPercent = hpPercent;
         target = other;
         targetKind = "ally";
       }
     });
 
-    // 2. Heal player if no weaker ally needs healing.
     const playerHpPercent = this.playerStats.hp / this.playerStats.maxHp;
     const playerDistance = Phaser.Math.Distance.Between(ally.x, ally.y, this.player.x, this.player.y);
 
-    if (!target && playerHpPercent < 0.9 && playerDistance < searchRange) {
+    if ((!target || playerHpPercent < lowestHpPercent) && playerHpPercent < 0.92 && playerDistance < searchRange) {
       target = this.player;
       targetKind = "player";
       lowestHpPercent = playerHpPercent;
     }
 
-    // 3. If nobody needs healing, stay useful but avoid standing still forever.
     if (!target) {
       this.freeAllyWander(ally, time);
       return;
     }
 
-    const targetX = target.x;
-    const targetY = target.y;
-    const distance = Phaser.Math.Distance.Between(ally.x, ally.y, targetX, targetY);
+    const distance = Phaser.Math.Distance.Between(ally.x, ally.y, target.x, target.y);
 
     if (distance > healRange) {
       if (time > ally.nextMoveDecision) {
-        ally.nextMoveDecision = time + 350;
-        this.physics.moveTo(ally, targetX, targetY, ally.speed || 45);
+        ally.nextMoveDecision = time + 300;
+        this.physics.moveTo(ally, target.x, target.y, ally.speed || 58);
       }
     } else {
       ally.body.setVelocity(0);
     }
 
-    if (distance <= healRange && time - ally.lastHeal > 1150) {
+    if (distance <= healRange && time - ally.lastHeal > 950) {
       ally.lastHeal = time;
       ally.body.setVelocity(0);
 
       if (targetKind === "player") {
-        const healAmount = 16;
+        const healAmount = 18;
         this.playerStats.hp = Math.min(this.playerStats.maxHp, this.playerStats.hp + healAmount);
         this.showFloatingText(this.player.x, this.player.y - 55, `+${healAmount} HP`, "#22c55e");
       } else {
-        const healAmount = 22;
+        const healAmount = 26;
         target.hp = Math.min(target.maxHp, target.hp + healAmount);
         this.updateAllyHealthBar?.(target);
         this.showFloatingText(target.x, target.y - 55, `+${healAmount} HP`, "#22c55e");
@@ -2165,20 +2175,20 @@ export default class WorldScene extends Phaser.Scene {
     if (distance > stopDistance) {
       if (time > ally.nextMoveDecision) {
         ally.nextMoveDecision = time + 220;
-        this.physics.moveTo(ally, enemy.x, enemy.y, ally.speed || 70);
+        this.physics.moveTo(ally, enemy.x, enemy.y, ally.speed || 72);
       }
     } else {
       ally.body.setVelocity(0);
     }
 
-    if (distance < 78 && time - ally.lastAttack > 850) {
+    if (distance < 78 && time - ally.lastAttack > 800) {
       ally.lastAttack = time;
       ally.body.setVelocity(0);
 
       this.playUnitAttackAnimation?.(ally);
 
-      enemy.hp -= ally.damage;
-      this.showDamage(enemy.x, enemy.y, ally.damage, "#93c5fd");
+      enemy.hp -= ally.damage || 13;
+      this.showDamage(enemy.x, enemy.y, ally.damage || 13, "#93c5fd");
       this.updateEnemyHealthBar?.(enemy);
 
       if (enemy.hp <= 0) this.killEnemy(enemy);
@@ -2186,41 +2196,33 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   updateArcherAlly(ally, enemy, distance, time) {
-    const dangerDistance = 135;
-    const idealMin = 210;
-    const idealMax = ally.range || 420;
+    const dangerDistance = 125;
+    const shootRange = ally.range || 620;
+    const moveCloserDistance = shootRange * 0.92;
 
-    // If enemy is too close, back away.
     if (distance < dangerDistance) {
       if (time > ally.nextMoveDecision) {
-        ally.nextMoveDecision = time + 450;
+        ally.nextMoveDecision = time + 420;
 
         const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, ally.x, ally.y);
-        const fleeX = Phaser.Math.Clamp(ally.x + Math.cos(angle) * 120, 40, this.worldW - 40);
-        const fleeY = Phaser.Math.Clamp(ally.y + Math.sin(angle) * 120, 40, this.worldH - 40);
+        const fleeX = Phaser.Math.Clamp(ally.x + Math.cos(angle) * 135, 40, this.worldW - 40);
+        const fleeY = Phaser.Math.Clamp(ally.y + Math.sin(angle) * 135, 40, this.worldH - 40);
 
-        this.physics.moveTo(ally, fleeX, fleeY, ally.speed || 45);
+        this.physics.moveTo(ally, fleeX, fleeY, ally.speed || 52);
       }
-    }
-
-    // If enemy is too far but still visible, move closer slowly.
-    else if (distance > idealMax * 0.85) {
+    } else if (distance > moveCloserDistance) {
       if (time > ally.nextMoveDecision) {
         ally.nextMoveDecision = time + 500;
-        this.physics.moveTo(ally, enemy.x, enemy.y, (ally.speed || 45) * 0.55);
+        this.physics.moveTo(ally, enemy.x, enemy.y, (ally.speed || 52) * 0.5);
       }
-    }
-
-    // If enemy is in good range, stop and shoot.
-    else {
+    } else {
       ally.body.setVelocity(0);
     }
 
-    if (distance <= idealMax && time - ally.lastAttack > 1050) {
+    if (distance <= shootRange && time - ally.lastAttack > 850) {
       ally.lastAttack = time;
       ally.body.setVelocity(0);
-
-      this.shootProjectile(ally, enemy, ally.damage, 0xfacc15);
+      this.shootProjectile(ally, enemy, ally.damage || 13, 0xfacc15);
     }
   }
 
@@ -2257,32 +2259,36 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   shootProjectile(from, target, damage, color) {
-    this.animateRangedAttack(from);
+    if (!from || !target || !target.active) return;
+
+    this.playUnitAttackAnimation?.(from);
 
     const angle = Phaser.Math.Angle.Between(from.x, from.y, target.x, target.y);
 
-    const projectile = this.add.rectangle(from.x, from.y, 28, 4, color);
+    const projectile = this.add.rectangle(from.x, from.y, 34, 5, color || 0xfacc15);
     projectile.setRotation(angle);
+    projectile.setDepth(7000);
 
-    projectile.trail = this.add.rectangle(from.x, from.y, 18, 3, color, 0.28);
+    projectile.trail = this.add.rectangle(from.x, from.y, 22, 4, color || 0xfacc15, 0.28);
     projectile.trail.setRotation(angle);
+    projectile.trail.setDepth(6999);
 
     this.physics.add.existing(projectile);
 
     projectile.damage = damage;
     this.projectiles.add(projectile);
 
-    this.physics.moveTo(projectile, target.x, target.y, 440);
-    this.playSound("arrow");
+    this.physics.moveTo(projectile, target.x, target.y, 620);
+    this.playSound?.("arrow");
 
     this.tweens.add({
       targets: projectile.trail,
       alpha: 0,
-      duration: 250,
+      duration: 350,
       onComplete: () => projectile.trail?.destroy(),
     });
 
-    this.time.delayedCall(1300, () => {
+    this.time.delayedCall(2200, () => {
       if (projectile.active) projectile.destroy();
       if (projectile.trail?.active) projectile.trail.destroy();
     });
@@ -2738,6 +2744,11 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   saveGame() {
+    if (this.gameEnded) {
+      this.showMessage("Cannot save after Game Over.");
+      return;
+    }
+
     const saveData = {
       wave: this.wave,
       castleHealth: this.castleHealth,
@@ -2755,14 +2766,15 @@ export default class WorldScene extends Phaser.Scene {
 
     this.lastSavedText = new Date(saveData.savedAt).toLocaleString();
     this.showMessage("Game saved.");
-    this.updateUI();
+    this.updateUI?.();
   }
+
 
   loadGame() {
     const raw = localStorage.getItem(SAVE_KEY);
 
     if (!raw) {
-      this.showMessage("No save found. Press P first to save.");
+      this.showMessage("No save file found.");
       return;
     }
 
@@ -2791,17 +2803,19 @@ export default class WorldScene extends Phaser.Scene {
 
       this.lastSavedText = saveData.savedAt ? new Date(saveData.savedAt).toLocaleString() : "Unknown";
 
-      this.clearEnemiesProjectilesLoot();
-      this.spawnWave();
+      this.clearEnemiesProjectilesLoot?.();
+      this.spawnWave?.();
 
-      this.showMessage("Game loaded. Active enemies reset for safety.");
-      this.updatePanels();
-      this.updateUI();
+      this.showMessage("Save loaded.");
+      this.updatePanels?.();
+      this.updateUI?.();
+      this.updateCastleDamageVisuals?.();
     } catch (error) {
       console.error(error);
-      this.showMessage("Save file is corrupted. Could not load.");
+      this.showMessage("Save file corrupted.");
     }
   }
+
 
   clearEnemiesProjectilesLoot() {
     this.enemies.children.iterate((enemy) => {
@@ -3717,36 +3731,38 @@ export default class WorldScene extends Phaser.Scene {
   }
 
   updateHelpPanel() {
+    if (!this.helpPanel) return;
+
+    this.helpPanel.setVisible(true);
+
     if (!this.helpVisible) {
-      this.helpPanel.setVisible(true);
-      this.helpPanel.setText("H: Keys");
+      this.helpPanel.setText("H: Show keys");
       return;
     }
 
-    this.helpPanel.setVisible(true);
     this.helpPanel.setText(
       [
         "KEYS",
         "WASD Move",
         "Shift Run",
-        "Space Hit",
+        "Space Attack",
         "E Talk",
         "B Shop",
         "I Bag",
-        "Q Quest",
+        "Q Quests",
         "O Upgrades",
-        "M Sound",
-        "N New game menu",
         "U Potion",
-        "R Repair",
+        "R Repair / Restart",
         "P Save",
-        "4 Sell loot",
         "L Load",
+        "X Delete save",
+        "M Sound",
         "ESC Pause",
         "H Hide",
       ].join("\n")
     );
   }
+
 
   updatePanels() {
     if (this.shopOpen) {
