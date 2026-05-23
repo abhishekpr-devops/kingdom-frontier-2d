@@ -2218,6 +2218,29 @@ export default class WorldScene extends Phaser.Scene {
 
       this.updateAllyHealthBar?.(ally);
 
+      // Castle Archer is a fixed wall unit.
+      // It should never follow the player.
+      if (ally.role === "castleArcher") {
+        ally.x = ally.fixedX ?? ally.homeX ?? ally.x;
+        ally.y = ally.fixedY ?? ally.homeY ?? ally.y;
+
+        if (ally.body) {
+          ally.body.setVelocity(0);
+          ally.body.x = ally.x - ally.body.width / 2;
+          ally.body.y = ally.y - ally.body.height / 2;
+        }
+
+        const target = this.getBestEnemyTargetForAlly(ally, ally.range || 900, true);
+
+        if (target && time - ally.lastAttack > 750) {
+          ally.lastAttack = time;
+          ally.currentTarget = target;
+          this.shootProjectile(ally, target, ally.damage || 16, 0xf59e0b);
+        }
+
+        return;
+      }
+
       const role = ally.role || "other";
       const slotIndex = roleCounts[role] ?? 0;
       roleCounts[role] = slotIndex + 1;
@@ -2229,8 +2252,8 @@ export default class WorldScene extends Phaser.Scene {
         return;
       }
 
-      if (role === "archer" || role === "castleArcher") {
-        const target = this.getBestEnemyTargetForAlly(ally, ally.range || 650, role === "castleArcher");
+      if (role === "archer") {
+        const target = this.getBestEnemyTargetForAlly(ally, ally.range || 650, false);
 
         if (target) {
           const distance = Phaser.Math.Distance.Between(ally.x, ally.y, target.x, target.y);
@@ -2242,7 +2265,7 @@ export default class WorldScene extends Phaser.Scene {
         return;
       }
 
-      // Knights stay in front of player and intercept enemies.
+      // Knights stay behind the player and intercept nearby enemies.
       const target = this.getBestEnemyTargetForAlly(ally, 230, false);
 
       if (target) {
@@ -2254,60 +2277,100 @@ export default class WorldScene extends Phaser.Scene {
     });
   }
 
+
   getAllyFormationSlot(ally, slotIndex = 0) {
     const px = this.player.x;
     const py = this.player.y;
 
-    // Enemies mostly come from the right side, so front means right of the player.
+    // Castle Archer is fixed on castle wall.
+    // This return is only a safety fallback.
+    if (ally.role === "castleArcher") {
+      return {
+        x: ally.fixedX ?? ally.homeX ?? ally.x,
+        y: ally.fixedY ?? ally.homeY ?? ally.y,
+      };
+    }
+
+    // V0.30 party formation:
+    // All mobile allies stay behind the player with clear spacing.
+    const rowGap = 82;
+    const colGap = 72;
+
     if (ally.role === "knight") {
       const slots = [
-        { x: px + 82, y: py - 38 },
-        { x: px + 82, y: py + 38 },
-        { x: px + 115, y: py },
+        { x: px - rowGap, y: py - colGap },
+        { x: px - rowGap, y: py + colGap },
+        { x: px - rowGap * 1.45, y: py },
       ];
 
       return slots[slotIndex % slots.length];
     }
 
     if (ally.role === "healer") {
-      return { x: px - 55, y: py };
-    }
-
-    if (ally.role === "archer") {
       const slots = [
-        { x: px - 35, y: py - 92 },
-        { x: px - 35, y: py + 92 },
-        { x: px - 95, y: py - 55 },
-        { x: px - 95, y: py + 55 },
+        { x: px - rowGap * 2.1, y: py },
+        { x: px - rowGap * 2.25, y: py - colGap },
+        { x: px - rowGap * 2.25, y: py + colGap },
       ];
 
       return slots[slotIndex % slots.length];
     }
 
-    if (ally.role === "castleArcher") {
-      return { x: px - 105, y: py - 5 };
+    if (ally.role === "archer") {
+      const slots = [
+        { x: px - rowGap * 2.9, y: py - colGap * 1.35 },
+        { x: px - rowGap * 2.9, y: py + colGap * 1.35 },
+        { x: px - rowGap * 3.6, y: py - colGap * 0.45 },
+        { x: px - rowGap * 3.6, y: py + colGap * 0.45 },
+      ];
+
+      return slots[slotIndex % slots.length];
     }
 
-    return { x: px - 70, y: py + 70 };
+    return { x: px - rowGap * 2.5, y: py };
   }
 
+
   moveAllyToFormation(ally, time) {
+    if (!ally || !ally.body) return;
+
+    // Castle Archer is fixed on wall.
+    if (ally.role === "castleArcher") {
+      ally.x = ally.fixedX ?? ally.homeX ?? ally.x;
+      ally.y = ally.fixedY ?? ally.homeY ?? ally.y;
+      ally.body.setVelocity(0);
+      return;
+    }
+
     if (!ally.formationSlot) return;
 
-    const targetX = Phaser.Math.Clamp(ally.formationSlot.x, 50, this.worldW - 50);
-    const targetY = Phaser.Math.Clamp(ally.formationSlot.y, 50, this.worldH - 50);
+    const targetX = Phaser.Math.Clamp(ally.formationSlot.x, 90, this.worldW - 90);
+    const targetY = Phaser.Math.Clamp(ally.formationSlot.y, 90, this.worldH - 90);
 
     const distance = Phaser.Math.Distance.Between(ally.x, ally.y, targetX, targetY);
 
-    if (distance > 22) {
+    const stopRadius = ally.role === "healer" ? 46 : ally.role === "archer" ? 52 : 44;
+
+    if (distance > stopRadius) {
       if (time > ally.nextMoveDecision) {
-        ally.nextMoveDecision = time + 160;
-        this.physics.moveTo(ally, targetX, targetY, ally.speed || 65);
+        ally.nextMoveDecision = time + 130;
+
+        const moveSpeed =
+          ally.role === "knight" ? 82 :
+          ally.role === "healer" ? 66 :
+          ally.role === "archer" ? 64 :
+          65;
+
+        this.physics.moveTo(ally, targetX, targetY, moveSpeed);
       }
     } else {
-      ally.body.setVelocity(0);
+      ally.body.setVelocity(
+        ally.body.velocity.x * 0.2,
+        ally.body.velocity.y * 0.2
+      );
     }
   }
+
 
   getBestEnemyTargetForAlly(ally, maxRange = 650, preferCastleThreat = false) {
     if (!this.enemies) return null;
